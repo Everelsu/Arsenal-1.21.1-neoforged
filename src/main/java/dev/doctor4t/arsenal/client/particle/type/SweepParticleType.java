@@ -1,8 +1,8 @@
 package dev.doctor4t.arsenal.client.particle.type;
 
 import dev.doctor4t.arsenal.client.particle.contract.ColoredParticleInitialData;
-import net.minecraft.particle.SimpleParticleType;
-import net.minecraft.particle.ParticleEffect;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.SimpleParticleType;
 
 public class SweepParticleType extends SimpleParticleType {
     public ColoredParticleInitialData initialData;
@@ -11,7 +11,7 @@ public class SweepParticleType extends SimpleParticleType {
         super(alwaysShow);
     }
 
-    public ParticleEffect setData(ColoredParticleInitialData target) {
+    public ParticleOptions setData(ColoredParticleInitialData target) {
         this.initialData = target;
         return this;
     }

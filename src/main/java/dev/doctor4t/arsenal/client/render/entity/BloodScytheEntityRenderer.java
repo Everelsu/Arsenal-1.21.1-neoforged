@@ -1,52 +1,50 @@
 package dev.doctor4t.arsenal.client.render.entity;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.entity.BloodScytheEntity;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
-import org.joml.Matrix4f;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 
 public class BloodScytheEntityRenderer<T extends BloodScytheEntity> extends EntityRenderer<T> {
-    public static final Identifier TEXTURE = Identifier.of(Arsenal.MOD_ID, "textures/entity/blood_scythe.png");
+    public static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(Arsenal.MOD_ID, "textures/entity/blood_scythe.png");
 
-    public BloodScytheEntityRenderer(EntityRendererFactory.Context context) {
+    public BloodScytheEntityRenderer(EntityRendererProvider.Context context) {
         super(context);
     }
 
     @Override
-    public void render(T bloodScythe, float f, float g, MatrixStack matrixStack, VertexConsumerProvider vertexConsumerProvider, int i) {
-        matrixStack.push();
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(MathHelper.lerp(g, bloodScythe.prevYaw, bloodScythe.getYaw()) - 90.0f));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(MathHelper.lerp(g, bloodScythe.prevPitch, bloodScythe.getPitch())));
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(45.0f));
+    public void render(T bloodScythe, float f, float g, PoseStack matrixStack, MultiBufferSource vertexConsumerProvider, int i) {
+        matrixStack.pushPose();
+        matrixStack.mulPose(Axis.YP.rotationDegrees(Mth.lerp(g, bloodScythe.yRotO, bloodScythe.getYRot()) - 90.0f));
+        matrixStack.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(g, bloodScythe.xRotO, bloodScythe.getXRot())));
+        matrixStack.mulPose(Axis.XP.rotationDegrees(45.0f));
         matrixStack.scale(0.4f, 0.4f, 0.4f);
         matrixStack.translate(-4.0, 0.0, 0.0);
         for (int u = 0; u < 4; ++u) {
-            matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90f));
+            matrixStack.mulPose(Axis.XP.rotationDegrees(90f));
         }
-        matrixStack.pop();
+        matrixStack.popPose();
         super.render(bloodScythe, f, g, matrixStack, vertexConsumerProvider, i);
     }
 
     @Override
-    public Identifier getTexture(T entity) {
+    public ResourceLocation getTextureLocation(T entity) {
         return TEXTURE;
     }
 
-    // FIX: normal() now takes MatrixStack.Entry, not separate Matrix3f; also removed .next()
-    public void vertex(MatrixStack.Entry entry, VertexConsumer vertexConsumer, int x, int y, int z, float u, float v, int normalX, int normalZ, int normalY, int light) {
-        vertexConsumer.vertex(entry.getPositionMatrix(), x, y, z)
-                .color(255, 255, 255, 255)
-                .texture(u, v)
-                .overlay(OverlayTexture.DEFAULT_UV)
-                .light(light)
-                .normal(entry, normalX, normalY, normalZ);
+    public void vertex(PoseStack.Pose entry, VertexConsumer vertexConsumer, int x, int y, int z, float u, float v, int normalX, int normalZ, int normalY, int light) {
+        vertexConsumer.addVertex(entry.pose(), x, y, z)
+                .setColor(255, 255, 255, 255)
+                .setUv(u, v)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(light)
+                .setNormal(entry, normalX, normalY, normalZ);
     }
 }

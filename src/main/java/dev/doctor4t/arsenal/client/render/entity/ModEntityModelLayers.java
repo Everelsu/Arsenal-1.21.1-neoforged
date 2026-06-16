@@ -1,33 +1,25 @@
 package dev.doctor4t.arsenal.client.render.entity;
 
 import dev.doctor4t.arsenal.Arsenal;
-import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.TexturedModelDataProvider;
-import net.minecraft.client.render.entity.model.EntityModelLayer;
+import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public interface ModEntityModelLayers {
-    Map<EntityModelLayer, TexturedModelDataProvider> MODEL_LAYERS = new LinkedHashMap<>();
+    Map<ModelLayerLocation, Supplier<LayerDefinition>> MODEL_LAYERS = new LinkedHashMap<>();
 
-    EntityModelLayer ANCHORBLADE = createModelLayer("anchorblade", AnchorBladeEntityModel::getTexturedModelData);
+    ModelLayerLocation ANCHORBLADE = createModelLayer("anchorblade", AnchorBladeEntityModel::getTexturedModelData);
 
-    private static EntityModelLayer createModelLayer(String name, TexturedModelDataProvider provider) {
-        EntityModelLayer entityModelLayer = createMain(name);
-        MODEL_LAYERS.put(entityModelLayer, provider);
-        return entityModelLayer;
+    private static ModelLayerLocation createModelLayer(String name, Supplier<LayerDefinition> provider) {
+        ModelLayerLocation layer = create(name, "main");
+        MODEL_LAYERS.put(layer, provider);
+        return layer;
     }
 
-    private static EntityModelLayer createMain(String id) {
-        return create(id, "main");
-    }
-
-    private static EntityModelLayer create(String id, String layer) {
-        return new EntityModelLayer(Arsenal.id(id), layer);
-    }
-
-    static void initialize() {
-        MODEL_LAYERS.forEach(EntityModelLayerRegistry::registerModelLayer);
+    private static ModelLayerLocation create(String id, String layer) {
+        return new ModelLayerLocation(Arsenal.id(id), layer);
     }
 }
