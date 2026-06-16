@@ -1,10 +1,10 @@
 package dev.doctor4t.arsenal.mixin;
 
 import dev.doctor4t.arsenal.util.ProjectileSlotHolder;
-import net.minecraft.entity.projectile.ProjectileEntity;
+import net.minecraft.world.entity.projectile.Projectile;
 import org.spongepowered.asm.mixin.Mixin;
 
-@Mixin(ProjectileEntity.class)
+@Mixin(Projectile.class)
 public class ProjectileEntityMixin implements ProjectileSlotHolder {
     private int arsenal$ownedSlot = -1;
 
