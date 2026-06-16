@@ -1,31 +1,27 @@
 package dev.doctor4t.arsenal.index;
 
 import dev.doctor4t.arsenal.Arsenal;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+public final class ArsenalSounds {
+    public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
+            DeferredRegister.create(Registries.SOUND_EVENT, Arsenal.MOD_ID);
 
-public interface ArsenalSounds {
-    Map<SoundEvent, Identifier> SOUND_EVENTS = new LinkedHashMap<>();
+    public static final DeferredHolder<SoundEvent, SoundEvent> ITEM_SCYTHE_HIT = create("item.scythe.hit");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ITEM_SCYTHE_SPEWING = create("item.scythe.spewing");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ENTITY_BLOOD_SCYTHE_HIT = create("entity.blood_scythe.hit");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ITEM_ANCHORBLADE_HIT = create("item.anchorblade.hit");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ITEM_ANCHORBLADE_THROW = create("item.anchorblade.throw");
+    public static final DeferredHolder<SoundEvent, SoundEvent> ENTITY_ANCHORBLADE_LAND = create("entity.anchorblade.land");
 
-    SoundEvent ITEM_SCYTHE_HIT = createSoundEvent("item.scythe.hit");
-    SoundEvent ITEM_SCYTHE_SPEWING = createSoundEvent("item.scythe.spewing");
-    SoundEvent ENTITY_BLOOD_SCYTHE_HIT = createSoundEvent("entity.blood_scythe.hit");
-    SoundEvent ITEM_ANCHORBLADE_HIT = createSoundEvent("item.anchorblade.hit");
-    SoundEvent ITEM_ANCHORBLADE_THROW = createSoundEvent("item.anchorblade.throw");
-    SoundEvent ENTITY_ANCHORBLADE_LAND = createSoundEvent("entity.anchorblade.land");
-
-    static void initialize() {
-        SOUND_EVENTS.keySet().forEach(soundEvent -> Registry.register(Registries.SOUND_EVENT, SOUND_EVENTS.get(soundEvent), soundEvent));
+    private static DeferredHolder<SoundEvent, SoundEvent> create(String path) {
+        return SOUND_EVENTS.register(path, () ->
+                SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(Arsenal.MOD_ID, path)));
     }
 
-    private static SoundEvent createSoundEvent(String path) {
-        SoundEvent soundEvent = SoundEvent.of(Identifier.of(Arsenal.MOD_ID, path));
-        SOUND_EVENTS.put(soundEvent, Identifier.of(Arsenal.MOD_ID, path));
-        return soundEvent;
-    }
+    private ArsenalSounds() {}
 }

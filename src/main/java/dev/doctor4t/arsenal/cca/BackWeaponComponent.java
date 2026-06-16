@@ -1,89 +1,142 @@
 package dev.doctor4t.arsenal.cca;
 
-import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
+import dev.doctor4t.arsenal.index.ArsenalAttachments;
+import dev.doctor4t.arsenal.network.BackWeaponSyncPayload;
 import dev.doctor4t.arsenal.network.HoldWeaponPayload;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.RegistryWrapper;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.attachment.IAttachmentHolder;
+import net.neoforged.neoforge.attachment.IAttachmentSerializer;
+import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
-public class BackWeaponComponent implements AutoSyncedComponent {
-    private final PlayerEntity player;
-    private final SimpleInventory backWeapon = new SimpleInventory(1);
+/**
+ * Per-player back-weapon storage. Ported from the Fabric Cardinal Components
+ * AutoSyncedComponent to a NeoForge data attachment. Server-side mutations are
+ * broadcast to tracking clients via {@link BackWeaponSyncPayload}.
+ */
+public class BackWeaponComponent {
+    private final @Nullable Player player;
+    private final SimpleContainer backWeapon;
     private boolean holdingBackWeapon = false;
 
-    public BackWeaponComponent(PlayerEntity player) {
-        this.player = player;
+    public BackWeaponComponent(@Nullable IAttachmentHolder holder) {
+        this.player = holder instanceof Player p ? p : null;
+        this.backWeapon = new SimpleContainer(1) {
+            @Override
+            public void setChanged() {
+                super.setChanged();
+                BackWeaponComponent.this.sync();
+            }
+        };
     }
 
-    @Override
-    public void readFromNbt(@NotNull NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
-        // Guard: only decode if the key exists and has an "id" field.
-        // In 1.21.1, ItemStack.fromNbt() throws on an empty compound (no "id" key).
-        NbtCompound backWeaponNbt = tag.getCompound("backWeapon");
-        if (backWeaponNbt.contains("id")) {
-            ItemStack.fromNbt(registryLookup, backWeaponNbt)
-                    .ifPresent(stack -> this.backWeapon.setStack(0, stack));
-        }
-        this.holdingBackWeapon = tag.getBoolean("holdingBackWeapon");
-    }
-
-    @Override
-    public void writeToNbt(@NotNull NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
-        // FIX: In 1.21.1, ItemStack.encode() throws IllegalStateException on an empty stack.
-        // Use encodeAllowEmpty() instead, which writes {count:0} for an empty stack and is
-        // safely round-tripped by the guarded readFromNbt above.
-        tag.put("backWeapon", this.backWeapon.getStack(0).encodeAllowEmpty(registryLookup));
-        tag.putBoolean("holdingBackWeapon", this.holdingBackWeapon);
-    }
+    // --- instance API ---
 
     public ItemStack getBackWeapon() {
-        return this.backWeapon.getStack(0);
+        return this.backWeapon.getItem(0);
     }
 
-    public static ItemStack getBackWeapon(PlayerEntity player) {
-        return ArsenalComponents.BACK_WEAPON_COMPONENT.get(player).getBackWeapon();
-    }
-
-    public boolean setBackWeapon(ItemStack backWeapon) {
-        this.backWeapon.setStack(0, backWeapon);
-        ArsenalComponents.BACK_WEAPON_COMPONENT.sync(this.player);
+    public boolean setBackWeapon(ItemStack stack) {
+        this.backWeapon.setItem(0, stack);
+        this.sync();
         return true;
     }
 
-    public static boolean setBackWeapon(PlayerEntity player, ItemStack backWeapon) {
-        return ArsenalComponents.BACK_WEAPON_COMPONENT.get(player).setBackWeapon(backWeapon);
-    }
-
-    public SimpleInventory getBackWeaponInventory() {
+    public SimpleContainer getBackWeaponInventory() {
         return this.backWeapon;
-    }
-
-    public static SimpleInventory getBackWeaponInventory(PlayerEntity player) {
-        return ArsenalComponents.BACK_WEAPON_COMPONENT.get(player).getBackWeaponInventory();
     }
 
     public boolean isHoldingBackWeapon() {
         return this.holdingBackWeapon;
     }
 
-    public static boolean isHoldingBackWeapon(PlayerEntity player) {
-        return ArsenalComponents.BACK_WEAPON_COMPONENT.get(player).isHoldingBackWeapon();
+    public void setHoldingBackWeapon(boolean holding) {
+        this.holdingBackWeapon = holding;
+        this.sync();
     }
 
-    public void setHoldingBackWeapon(boolean holdingBackWeapon) {
-        this.holdingBackWeapon = holdingBackWeapon;
-        ArsenalComponents.BACK_WEAPON_COMPONENT.sync(this.player);
+    private void sync() {
+        if (this.player != null && !this.player.level().isClientSide()) {
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(this.player,
+                    new BackWeaponSyncPayload(this.player.getId(), this.getBackWeapon(), this.holdingBackWeapon));
+        }
     }
 
-    public static void setHoldingBackWeapon(PlayerEntity player, boolean holdingBackWeapon) {
-        if (player.getWorld().isClient()) {
-            ClientPlayNetworking.send(new HoldWeaponPayload(holdingBackWeapon));
+    // --- (de)serialization ---
+
+    public CompoundTag save(HolderLookup.Provider provider) {
+        CompoundTag tag = new CompoundTag();
+        ItemStack stack = this.getBackWeapon();
+        if (!stack.isEmpty()) {
+            tag.put("backWeapon", stack.save(provider));
+        }
+        tag.putBoolean("holdingBackWeapon", this.holdingBackWeapon);
+        return tag;
+    }
+
+    public void load(CompoundTag tag, HolderLookup.Provider provider) {
+        if (tag.contains("backWeapon")) {
+            this.backWeapon.setItem(0, ItemStack.parseOptional(provider, tag.getCompound("backWeapon")));
+        }
+        this.holdingBackWeapon = tag.getBoolean("holdingBackWeapon");
+    }
+
+    public static final IAttachmentSerializer<CompoundTag, BackWeaponComponent> SERIALIZER =
+            new IAttachmentSerializer<>() {
+                @Override
+                public BackWeaponComponent read(IAttachmentHolder holder, CompoundTag tag, HolderLookup.Provider provider) {
+                    BackWeaponComponent component = new BackWeaponComponent(holder);
+                    component.load(tag, provider);
+                    return component;
+                }
+
+                @Override
+                public @Nullable CompoundTag write(BackWeaponComponent attachment, HolderLookup.Provider provider) {
+                    return attachment.save(provider);
+                }
+            };
+
+    // --- static helpers (preserve original API surface) ---
+
+    public static BackWeaponComponent get(Player player) {
+        return player.getData(ArsenalAttachments.BACK_WEAPON.get());
+    }
+
+    public static ItemStack getBackWeapon(Player player) {
+        return get(player).getBackWeapon();
+    }
+
+    public static boolean setBackWeapon(Player player, ItemStack stack) {
+        return get(player).setBackWeapon(stack);
+    }
+
+    public static SimpleContainer getBackWeaponInventory(Player player) {
+        return get(player).getBackWeaponInventory();
+    }
+
+    public static boolean isHoldingBackWeapon(Player player) {
+        return get(player).isHoldingBackWeapon();
+    }
+
+    public static void setHoldingBackWeapon(Player player, boolean holding) {
+        if (player.level().isClientSide()) {
+            PacketDistributor.sendToServer(new HoldWeaponPayload(holding));
             return;
         }
-        ArsenalComponents.BACK_WEAPON_COMPONENT.get(player).setHoldingBackWeapon(holdingBackWeapon);
+        get(player).setHoldingBackWeapon(holding);
+    }
+
+    /** Client-side application of a sync packet from the server. */
+    public static void applyClientSync(Entity entity, ItemStack stack, boolean holding) {
+        if (entity instanceof Player player) {
+            BackWeaponComponent component = get(player);
+            component.backWeapon.setItem(0, stack);
+            component.holdingBackWeapon = holding;
+        }
     }
 }

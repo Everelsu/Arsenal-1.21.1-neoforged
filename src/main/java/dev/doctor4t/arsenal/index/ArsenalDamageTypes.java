@@ -1,12 +1,12 @@
 package dev.doctor4t.arsenal.index;
 
 import dev.doctor4t.arsenal.Arsenal;
-import net.minecraft.entity.damage.DamageType;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.damagesource.DamageType;
 
 public interface ArsenalDamageTypes {
-    RegistryKey<DamageType> ANCHOR = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Arsenal.id("anchor"));
-    RegistryKey<DamageType> BLOOD_SCYTHE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Arsenal.id("blood_scythe"));
-    RegistryKey<DamageType> SPEWING = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Arsenal.id("spewing"));
+    ResourceKey<DamageType> ANCHOR = ResourceKey.create(Registries.DAMAGE_TYPE, Arsenal.id("anchor"));
+    ResourceKey<DamageType> BLOOD_SCYTHE = ResourceKey.create(Registries.DAMAGE_TYPE, Arsenal.id("blood_scythe"));
+    ResourceKey<DamageType> SPEWING = ResourceKey.create(Registries.DAMAGE_TYPE, Arsenal.id("spewing"));
 }

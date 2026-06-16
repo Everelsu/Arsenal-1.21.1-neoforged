@@ -4,47 +4,34 @@ import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
 import dev.doctor4t.arsenal.entity.BloodScytheEntity;
 import dev.doctor4t.arsenal.entity.WeaponRackEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.SpawnGroup;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+public final class ArsenalEntities {
+    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
+            DeferredRegister.create(Registries.ENTITY_TYPE, Arsenal.MOD_ID);
 
-public interface ArsenalEntities {
-    Map<EntityType<? extends Entity>, Identifier> ENTITIES = new LinkedHashMap<>();
+    public static final DeferredHolder<EntityType<?>, EntityType<BloodScytheEntity>> BLOOD_SCYTHE =
+            ENTITY_TYPES.register("blood_scythe", name -> EntityType.Builder.<BloodScytheEntity>of(BloodScytheEntity::new, MobCategory.MISC)
+                    .noSave()
+                    .sized(5.0f, 0.2f)
+                    .build(ResourceKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(Arsenal.MOD_ID, "blood_scythe"))));
 
-    // FIX: dimensions() takes (float width, float height) directly.
-    // FIX: trackRangeChunks/trackRangeBlocks both don't exist in 1.21.1's EntityType.Builder.
-    // The tracking range is now configured via the entity's SpawnGroup or left at the default.
-    // trackedUpdateRate() is also removed. Simply omit these builder calls.
-    EntityType<BloodScytheEntity> BLOOD_SCYTHE = createEntity("blood_scythe",
-            EntityType.Builder.<BloodScytheEntity>create(BloodScytheEntity::new, SpawnGroup.MISC)
-                    .disableSaving()
-                    .dimensions(5.0f, 0.2f)
-                    .build(Arsenal.MOD_ID + ":blood_scythe"));
+    public static final DeferredHolder<EntityType<?>, EntityType<AnchorbladeEntity>> ANCHORBLADE =
+            ENTITY_TYPES.register("anchorblade", name -> EntityType.Builder.<AnchorbladeEntity>of(AnchorbladeEntity::new, MobCategory.MISC)
+                    .noSave()
+                    .sized(1.2f, 1.2f)
+                    .build(ResourceKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(Arsenal.MOD_ID, "anchorblade"))));
 
-    EntityType<AnchorbladeEntity> ANCHORBLADE = createEntity("anchorblade",
-            EntityType.Builder.<AnchorbladeEntity>create(AnchorbladeEntity::new, SpawnGroup.MISC)
-                    .disableSaving()
-                    .dimensions(1.2f, 1.2f)
-                    .build(Arsenal.MOD_ID + ":anchorblade"));
+    public static final DeferredHolder<EntityType<?>, EntityType<WeaponRackEntity>> WEAPON_RACK =
+            ENTITY_TYPES.register("weapon_rack", name -> EntityType.Builder.<WeaponRackEntity>of(WeaponRackEntity::new, MobCategory.MISC)
+                    .sized(0.4F, 0.4F)
+                    .build(ResourceKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(Arsenal.MOD_ID, "weapon_rack"))));
 
-    EntityType<WeaponRackEntity> WEAPON_RACK = createEntity("weapon_rack",
-            EntityType.Builder.<WeaponRackEntity>create(WeaponRackEntity::new, SpawnGroup.MISC)
-                    .dimensions(0.4F, 0.4F)
-                    .build(Arsenal.MOD_ID + ":weapon_rack"));
-
-    private static <T extends EntityType<? extends Entity>> T createEntity(String name, T entity) {
-        ENTITIES.put(entity, Identifier.of(Arsenal.MOD_ID, name));
-        return entity;
-    }
-
-    static void initialize() {
-        ENTITIES.keySet().forEach(entityType ->
-                Registry.register(Registries.ENTITY_TYPE, ENTITIES.get(entityType), entityType));
-    }
+    private ArsenalEntities() {}
 }

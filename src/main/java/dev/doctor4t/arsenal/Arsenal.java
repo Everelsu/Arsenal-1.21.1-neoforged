@@ -3,87 +3,110 @@ package dev.doctor4t.arsenal;
 import dev.doctor4t.arsenal.cca.BackWeaponComponent;
 import dev.doctor4t.arsenal.index.*;
 import dev.doctor4t.arsenal.network.*;
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionHand;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
-public class Arsenal implements ModInitializer {
+@Mod(Arsenal.MOD_ID)
+public class Arsenal {
     public static final String MOD_ID = "arsenal";
 
-    public static Identifier id(String path) {
-        return Identifier.of(MOD_ID, path);
+    public static ResourceLocation id(String path) {
+        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
     }
 
-    @Override
-    public void onInitialize() {
-        ArsenalEntities.initialize();
-        ArsenalItems.initialize();
-        ArsenalSounds.initialize();
-        ArsenalParticles.initialize();
-        ArsenalStatusEffects.initialize();
+    public Arsenal(IEventBus modEventBus) {
+        // Registries
+        ArsenalItems.ITEMS.register(modEventBus);
+        ArsenalEntities.ENTITY_TYPES.register(modEventBus);
+        ArsenalSounds.SOUND_EVENTS.register(modEventBus);
+        ArsenalParticles.PARTICLE_TYPES.register(modEventBus);
+        ArsenalStatusEffects.MOB_EFFECTS.register(modEventBus);
+        ArsenalAttachments.ATTACHMENT_TYPES.register(modEventBus);
 
-        // Register all payload types (must be done on both sides before any send/receive)
-        PayloadTypeRegistry.playC2S().register(HoldWeaponPayload.ID, HoldWeaponPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(SwapWeaponPayload.ID, SwapWeaponPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(SwapInventoryPayload.ID, SwapInventoryPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(SetBackWeaponPayload.ID, SetBackWeaponPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(SweepPayload.ID, SweepPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(ShockwavePayload.ID, ShockwavePayload.CODEC);
+        // Mod-bus listeners
+        modEventBus.addListener(this::registerPayloads);
+        modEventBus.addListener(this::addCreativeTabEntries);
+    }
 
-        // Server-side receivers
-        ServerPlayNetworking.registerGlobalReceiver(HoldWeaponPayload.ID, (payload, context) ->
-                context.server().execute(() ->
-                        BackWeaponComponent.setHoldingBackWeapon(context.player(), payload.hold())
-                )
-        );
+    private void registerPayloads(final RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar("1");
 
-        ServerPlayNetworking.registerGlobalReceiver(SwapWeaponPayload.ID, (payload, context) ->
-                context.server().execute(() -> {
-                    var player = context.player();
+        // C2S
+        registrar.playToServer(HoldWeaponPayload.TYPE, HoldWeaponPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() ->
+                        BackWeaponComponent.setHoldingBackWeapon(context.player(), payload.hold())));
+
+        registrar.playToServer(SwapWeaponPayload.TYPE, SwapWeaponPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Player player = context.player();
                     if (!player.isSpectator()) {
                         boolean toggled = BackWeaponComponent.isHoldingBackWeapon(player);
                         BackWeaponComponent.setHoldingBackWeapon(player, false);
                         ItemStack itemStack = BackWeaponComponent.getBackWeapon(player);
-                        boolean success = BackWeaponComponent.setBackWeapon(player, player.getStackInHand(Hand.MAIN_HAND));
+                        boolean success = BackWeaponComponent.setBackWeapon(player, player.getItemInHand(InteractionHand.MAIN_HAND));
                         if (success) {
-                            player.setStackInHand(Hand.MAIN_HAND, itemStack);
+                            player.setItemInHand(InteractionHand.MAIN_HAND, itemStack);
                         }
-                        player.clearActiveItem();
+                        player.stopUsingItem();
                         BackWeaponComponent.setHoldingBackWeapon(player, toggled);
                     }
-                })
-        );
+                }));
 
-        // Creative back-slot: client sends the desired ItemStack directly.
-        // Server applies it; BackWeaponComponent (CCA AutoSynced) handles the sync.
-        ServerPlayNetworking.registerGlobalReceiver(SetBackWeaponPayload.ID, (payload, context) ->
-                context.server().execute(() -> {
-                    var player = context.player();
+        registrar.playToServer(SetBackWeaponPayload.TYPE, SetBackWeaponPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Player player = context.player();
                     if (!player.isSpectator()) {
                         BackWeaponComponent.setBackWeapon(player, payload.stack());
                     }
-                })
-        );
+                }));
 
-        ServerPlayNetworking.registerGlobalReceiver(SwapInventoryPayload.ID, (payload, context) ->
-                context.server().execute(() -> {
-                    var player = context.player();
+        registrar.playToServer(SwapInventoryPayload.TYPE, SwapInventoryPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Player player = context.player();
                     if (!player.isSpectator()) {
-                        if (!player.currentScreenHandler.isValid(payload.slotId())) {
+                        AbstractContainerMenu menu = player.containerMenu;
+                        int slotId = payload.slotId();
+                        if (slotId < 0 || slotId >= menu.slots.size()) {
                             return;
                         }
-                        Slot slot = player.currentScreenHandler.getSlot(payload.slotId());
+                        Slot slot = menu.getSlot(slotId);
                         ItemStack itemStack = BackWeaponComponent.getBackWeapon(player);
-                        boolean success = BackWeaponComponent.setBackWeapon(player, slot.getStack());
+                        boolean success = BackWeaponComponent.setBackWeapon(player, slot.getItem());
                         if (success) {
-                            slot.setStack(itemStack);
+                            slot.set(itemStack);
                         }
                     }
-                })
-        );
+                }));
+
+        // S2C
+        registrar.playToClient(SweepPayload.TYPE, SweepPayload.STREAM_CODEC,
+                dev.doctor4t.arsenal.client.ArsenalClientNetworking::handleSweep);
+        registrar.playToClient(ShockwavePayload.TYPE, ShockwavePayload.STREAM_CODEC,
+                dev.doctor4t.arsenal.client.ArsenalClientNetworking::handleShockwave);
+        registrar.playToClient(BackWeaponSyncPayload.TYPE, BackWeaponSyncPayload.STREAM_CODEC,
+                dev.doctor4t.arsenal.client.ArsenalClientNetworking::handleBackWeaponSync);
+    }
+
+    private void addCreativeTabEntries(final BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.COMBAT) {
+            event.insertAfter(Items.TRIDENT.getDefaultInstance(), ArsenalItems.SCYTHE.get().getDefaultInstance(),
+                    BuildCreativeModeTabContentsEvent.TabVisibility.PARENT_AND_SEARCH_TABS);
+            event.insertAfter(ArsenalItems.SCYTHE.get().getDefaultInstance(), ArsenalItems.ANCHORBLADE.get().getDefaultInstance(),
+                    BuildCreativeModeTabContentsEvent.TabVisibility.PARENT_AND_SEARCH_TABS);
+        } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
+            event.insertAfter(Items.GLOW_ITEM_FRAME.getDefaultInstance(), ArsenalItems.WEAPON_RACK.get().getDefaultInstance(),
+                    BuildCreativeModeTabContentsEvent.TabVisibility.PARENT_AND_SEARCH_TABS);
+        }
     }
 }

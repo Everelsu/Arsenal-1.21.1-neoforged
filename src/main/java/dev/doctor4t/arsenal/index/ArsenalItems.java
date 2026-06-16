@@ -4,45 +4,20 @@ import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.item.AnchorbladeItem;
 import dev.doctor4t.arsenal.item.ScytheItem;
 import dev.doctor4t.arsenal.item.WeaponRackItem;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Rarity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+public final class ArsenalItems {
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Arsenal.MOD_ID);
 
-public interface ArsenalItems {
-    Map<Item, Identifier> ITEMS = new LinkedHashMap<>();
+    public static final DeferredItem<Item> SCYTHE = ITEMS.registerItem("scythe",
+            properties -> new ScytheItem(ArsenalToolMaterials.SCYTHE, 5.0f, -3.0f, properties.rarity(Rarity.COMMON)));
+    public static final DeferredItem<Item> ANCHORBLADE = ITEMS.registerItem("anchorblade",
+            properties -> new AnchorbladeItem(ArsenalToolMaterials.ANCHORBLADE, 5, -3.0f, properties.rarity(Rarity.COMMON)));
+    public static final DeferredItem<Item> WEAPON_RACK = ITEMS.registerItem("weapon_rack",
+            WeaponRackItem::new);
 
-    Item SCYTHE = create("scythe", new ScytheItem(ArsenalToolMaterials.SCYTHE, 5.0f, -3.0f, new Item.Settings().rarity(Rarity.COMMON)));
-    Item ANCHORBLADE = create("anchorblade", new AnchorbladeItem(ArsenalToolMaterials.ANCHORBLADE, 5, -3.0f, new Item.Settings().rarity(Rarity.COMMON)));
-    Item WEAPON_RACK = create("weapon_rack", new WeaponRackItem(new Item.Settings()));
-
-    static <T extends Item> T create(String name, T item) {
-        ITEMS.put(item, Arsenal.id(name));
-
-        return item;
-    }
-
-    static void initialize() {
-        ITEMS.forEach((item, id) -> Registry.register(Registries.ITEM, id, item));
-
-        ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(ArsenalItems::addCombatEntries);
-        ItemGroupEvents.modifyEntriesEvent(ItemGroups.FUNCTIONAL).register(ArsenalItems::addFunctionalEntries);
-    }
-
-    private static void addCombatEntries(FabricItemGroupEntries fabricItemGroupEntries) {
-        fabricItemGroupEntries.addAfter(Items.TRIDENT, SCYTHE);
-        fabricItemGroupEntries.addAfter(SCYTHE, ANCHORBLADE);
-    }
-
-    private static void addFunctionalEntries(FabricItemGroupEntries fabricItemGroupEntries) {
-        fabricItemGroupEntries.addAfter(Items.GLOW_ITEM_FRAME, WEAPON_RACK);
-    }
+    private ArsenalItems() {}
 }

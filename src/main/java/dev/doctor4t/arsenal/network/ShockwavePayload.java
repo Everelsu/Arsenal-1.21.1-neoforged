@@ -1,15 +1,14 @@
 package dev.doctor4t.arsenal.network;
 
 import dev.doctor4t.arsenal.Arsenal;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record ShockwavePayload(double x, double y, double z) implements CustomPayload {
-    public static final Id<ShockwavePayload> ID =
-            new Id<>(Arsenal.id("shockwave"));
-    public static final PacketCodec<PacketByteBuf, ShockwavePayload> CODEC = PacketCodec.of(
-            (payload, buf) -> {
+public record ShockwavePayload(double x, double y, double z) implements CustomPacketPayload {
+    public static final Type<ShockwavePayload> TYPE = new Type<>(Arsenal.id("shockwave"));
+    public static final StreamCodec<FriendlyByteBuf, ShockwavePayload> STREAM_CODEC = StreamCodec.of(
+            (buf, payload) -> {
                 buf.writeDouble(payload.x());
                 buf.writeDouble(payload.y());
                 buf.writeDouble(payload.z());
@@ -18,7 +17,7 @@ public record ShockwavePayload(double x, double y, double z) implements CustomPa
     );
 
     @Override
-    public Id<ShockwavePayload> getId() {
-        return ID;
+    public Type<ShockwavePayload> type() {
+        return TYPE;
     }
 }

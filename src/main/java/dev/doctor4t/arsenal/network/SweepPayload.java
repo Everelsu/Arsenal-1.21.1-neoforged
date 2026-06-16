@@ -1,15 +1,14 @@
 package dev.doctor4t.arsenal.network;
 
 import dev.doctor4t.arsenal.Arsenal;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record SweepPayload(int color, int shadowColor, double x, double y, double z) implements CustomPayload {
-    public static final CustomPayload.Id<SweepPayload> ID =
-            new CustomPayload.Id<>(Arsenal.id("sweep"));
-    public static final PacketCodec<PacketByteBuf, SweepPayload> CODEC = PacketCodec.of(
-            (payload, buf) -> {
+public record SweepPayload(int color, int shadowColor, double x, double y, double z) implements CustomPacketPayload {
+    public static final Type<SweepPayload> TYPE = new Type<>(Arsenal.id("sweep"));
+    public static final StreamCodec<FriendlyByteBuf, SweepPayload> STREAM_CODEC = StreamCodec.of(
+            (buf, payload) -> {
                 buf.writeInt(payload.color());
                 buf.writeInt(payload.shadowColor());
                 buf.writeDouble(payload.x());
@@ -20,7 +19,7 @@ public record SweepPayload(int color, int shadowColor, double x, double y, doubl
     );
 
     @Override
-    public Id<SweepPayload> getId() {
-        return ID;
+    public Type<SweepPayload> type() {
+        return TYPE;
     }
 }
