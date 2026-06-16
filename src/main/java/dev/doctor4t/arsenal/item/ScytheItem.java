@@ -1,9 +1,7 @@
 package dev.doctor4t.arsenal.item;
 
-import com.google.common.collect.LinkedHashMultimap;
-import com.google.common.collect.Multimap;
-import com.jamieswhiteshirt.reachentityattributes.ReachEntityAttributes;
-import dev.doctor4t.arsenal.cca.ArsenalComponents;
+
+import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.cca.WeaponOwnerComponent;
 import dev.doctor4t.arsenal.entity.BloodScytheEntity;
 import dev.doctor4t.arsenal.index.ArsenalCosmetics;
@@ -17,19 +15,22 @@ import dev.doctor4t.ratatouille.util.TextUtils;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.item.TooltipContext;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.attribute.EntityAttribute;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.item.Item;
+import net.minecraft.component.type.AttributeModifierSlot;
+import net.minecraft.component.type.AttributeModifiersComponent;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemUsageContext;
 import net.minecraft.item.MiningToolItem;
+import net.minecraft.item.ToolItem;
 import net.minecraft.item.ToolMaterial;
+import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -48,19 +49,26 @@ import java.util.Locale;
 import java.util.UUID;
 
 public class ScytheItem extends MiningToolItem implements CustomHitParticleItem, CustomHitSoundItem, ArsenalWeaponItem {
-    private static final EntityAttributeModifier REACH_MODIFIER = new EntityAttributeModifier(UUID.fromString("911af262-067d-4da2-854c-20f03cc2dd8b"), "Weapon modifier", 0.5, EntityAttributeModifier.Operation.ADDITION);
+    // FIX: Arsenal.id() is now in scope — the missing import was the Arsenal class itself
+    private static final EntityAttributeModifier REACH_MODIFIER = new EntityAttributeModifier(Arsenal.id("scythe_reach"), 0.5, EntityAttributeModifier.Operation.ADD_VALUE);
 
     public ScytheItem(ToolMaterial material, float damage, float speed, Settings settings) {
-        super(damage, speed, material, BlockTags.HOE_MINEABLE, settings);
-    }
-
-    @Override
-    public Multimap<EntityAttribute, EntityAttributeModifier> getAttributeModifiers(EquipmentSlot slot) {
-        Multimap<EntityAttribute, EntityAttributeModifier> map = LinkedHashMultimap.create(super.getAttributeModifiers(slot));
-        if (slot == EquipmentSlot.MAINHAND) {
-            map.put(ReachEntityAttributes.ATTACK_RANGE, REACH_MODIFIER);
-        }
-        return map;
+        super(material, BlockTags.HOE_MINEABLE,
+                settings.attributeModifiers(
+                        AttributeModifiersComponent.builder()
+                                .add(EntityAttributes.GENERIC_ATTACK_DAMAGE,
+                                        new EntityAttributeModifier(ToolItem.BASE_ATTACK_DAMAGE_MODIFIER_ID,
+                                                damage + material.getAttackDamage(),
+                                                EntityAttributeModifier.Operation.ADD_VALUE),
+                                        AttributeModifierSlot.MAINHAND)
+                                .add(EntityAttributes.GENERIC_ATTACK_SPEED,
+                                        new EntityAttributeModifier(ToolItem.BASE_ATTACK_SPEED_MODIFIER_ID,
+                                                speed,
+                                                EntityAttributeModifier.Operation.ADD_VALUE),
+                                        AttributeModifierSlot.MAINHAND)
+                                .add(EntityAttributes.PLAYER_ENTITY_INTERACTION_RANGE, REACH_MODIFIER, AttributeModifierSlot.MAINHAND)
+                                .build()
+                ));
     }
 
     @Override
@@ -69,17 +77,15 @@ public class ScytheItem extends MiningToolItem implements CustomHitParticleItem,
         PlayerEntity user = context.getPlayer();
         if (user != null && user.isSneaking() && (blockStateClicked.isIn(BlockTags.ANVIL) || blockStateClicked.isOf(Blocks.SMITHING_TABLE)) && context.getWorld().isClient) {
             if (ArsenalCosmetics.isSupporter(user.getUuid())) {
-                WeaponOwnerComponent weaponOwnerComponent = ArsenalComponents.WEAPON_OWNER_COMPONENT.get(user.getStackInHand(context.getHand()));
+                UUID weaponOwner = WeaponOwnerComponent.getOwner(user.getStackInHand(context.getHand()));
                 Skin currentSkin = Skin.fromString(ArsenalCosmetics.getSkin(context.getStack()));
 
                 if (currentSkin == null) {
                     currentSkin = Skin.DEFAULT;
                 }
 
-                ArsenalCosmetics.setSkin(weaponOwnerComponent.getOwner(), context.getStack(), Skin.getNext(currentSkin).getName());
-
+                ArsenalCosmetics.setSkin(weaponOwner, context.getStack(), Skin.getNext(currentSkin).getName());
                 context.getPlayer().playSound(SoundEvents.BLOCK_SMITHING_TABLE_USE, 0.5f, 1.0f);
-
                 return ActionResult.SUCCESS;
             } else {
                 if (context.getWorld().isClient) {
@@ -94,7 +100,7 @@ public class ScytheItem extends MiningToolItem implements CustomHitParticleItem,
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity player, Hand hand) {
-        if (EnchantmentHelper.getEquipmentLevel(ArsenalEnchantments.SPEWING, player) > 0) {
+        if (ArsenalEnchantments.getEquipmentLevel(ArsenalEnchantments.SPEWING, player) > 0) {
             float f = 1.0f;
 
             if (!world.isClient) {
@@ -102,7 +108,7 @@ public class ScytheItem extends MiningToolItem implements CustomHitParticleItem,
                 bloodScythe.setOwner(player);
                 bloodScythe.setVelocity(player, player.getPitch(), player.getYaw(), 0.0f, f * 3.0f, 1.0f);
                 bloodScythe.setDamage(bloodScythe.getDamage());
-                player.getStackInHand(hand).damage(1, player, p -> p.sendToolBreakStatus(hand));
+                player.getStackInHand(hand).damage(1, player, hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
                 bloodScythe.pickupType = PersistentProjectileEntity.PickupPermission.CREATIVE_ONLY;
 
                 ArrayList<StatusEffectInstance> statusEffectsHalved = new ArrayList<>();
@@ -141,7 +147,7 @@ public class ScytheItem extends MiningToolItem implements CustomHitParticleItem,
     }
 
     @Override
-    public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
+    public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
         Skin skin = Skin.fromString(ArsenalCosmetics.getSkin(stack));
 
         if (skin != null && skin != Skin.DEFAULT) {
@@ -158,13 +164,12 @@ public class ScytheItem extends MiningToolItem implements CustomHitParticleItem,
             }
         }
 
-        super.appendTooltip(stack, world, tooltip, context);
+        super.appendTooltip(stack, context, tooltip, type);
     }
 
     @Override
     public void spawnHitParticles(PlayerEntity player) {
         if (player.getWorld() instanceof ServerWorld serverWorld) {
-
             Skin skin = Skin.DEFAULT;
             Skin toSkin = Skin.fromString(ArsenalCosmetics.getSkin(player.getMainHandStack()));
             if (toSkin != null) {
@@ -191,8 +196,7 @@ public class ScytheItem extends MiningToolItem implements CustomHitParticleItem,
         super.inventoryTick(stack, world, entity, slot, selected);
 
         if (entity instanceof PlayerEntity player) {
-            WeaponOwnerComponent weaponOwnerComponent = ArsenalComponents.WEAPON_OWNER_COMPONENT.get(stack);
-            weaponOwnerComponent.setOwner(player.getUuid());
+            WeaponOwnerComponent.setOwner(stack, player.getUuid());
         }
     }
 

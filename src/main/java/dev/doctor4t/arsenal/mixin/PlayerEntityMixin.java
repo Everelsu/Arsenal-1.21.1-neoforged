@@ -46,15 +46,17 @@ public abstract class PlayerEntityMixin extends LivingEntity implements AnchorOw
     @Shadow
     public abstract float getAttackCooldownProgress(float baseTime);
 
+    // In MC 1.21.1 disableShield takes no parameters: disableShield()V
+    // The old signature disableShield(boolean sprinting) no longer exists.
     @Shadow
-    public abstract void disableShield(boolean sprinting);
+    public abstract void disableShield();
 
     @Inject(method = "initDataTracker", at = @At("TAIL"))
-    private void arsenal$initDataTracker(CallbackInfo ci) {
-        this.dataTracker.startTracking(BASIC_ANCHOR_MAIN, -1);
-        this.dataTracker.startTracking(REELING_ANCHOR_MAIN, -1);
-        this.dataTracker.startTracking(BASIC_ANCHOR_OFF, -1);
-        this.dataTracker.startTracking(REELING_ANCHOR_OFF, -1);
+    private void arsenal$initDataTracker(DataTracker.Builder builder, CallbackInfo ci) {
+        builder.add(BASIC_ANCHOR_MAIN, -1);
+        builder.add(REELING_ANCHOR_MAIN, -1);
+        builder.add(BASIC_ANCHOR_OFF, -1);
+        builder.add(REELING_ANCHOR_OFF, -1);
     }
 
     @Inject(method = "getBlockBreakingSpeed", at = @At("RETURN"), cancellable = true)
@@ -80,7 +82,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements AnchorOw
     @Inject(method = "takeShieldHit", at = @At("HEAD"))
     protected void arsenal$scytheDisableShield(LivingEntity attacker, CallbackInfo ci) {
         if (attacker.getMainHandStack().getItem() instanceof ScytheItem) {
-            this.disableShield(true);
+            this.disableShield();
         }
     }
 

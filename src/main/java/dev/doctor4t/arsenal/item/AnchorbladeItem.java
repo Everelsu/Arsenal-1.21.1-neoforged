@@ -1,7 +1,6 @@
 package dev.doctor4t.arsenal.item;
 
 import dev.doctor4t.arsenal.Arsenal;
-import dev.doctor4t.arsenal.cca.ArsenalComponents;
 import dev.doctor4t.arsenal.cca.WeaponOwnerComponent;
 import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
 import dev.doctor4t.arsenal.index.ArsenalCosmetics;
@@ -16,14 +15,17 @@ import dev.doctor4t.ratatouille.util.TextUtils;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.item.TooltipContext;
 import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemUsageContext;
 import net.minecraft.item.PickaxeItem;
 import net.minecraft.item.ToolMaterial;
+import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -40,10 +42,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 
 public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleItem, CustomHitSoundItem, ArsenalWeaponItem {
     public AnchorbladeItem(ToolMaterial material, int attackDamage, float attackSpeed, Settings settings) {
-        super(material, attackDamage, attackSpeed, settings);
+        super(material, settings.attributeModifiers(
+                PickaxeItem.createAttributeModifiers(material, attackDamage, attackSpeed)
+        ));
     }
 
     @Override
@@ -52,14 +57,14 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
         PlayerEntity user = context.getPlayer();
         if (user != null && user.isSneaking() && (blockStateClicked.isIn(BlockTags.ANVIL) || blockStateClicked.isOf(Blocks.SMITHING_TABLE)) && context.getWorld().isClient) {
             if (ArsenalCosmetics.isSupporter(user.getUuid())) {
-                WeaponOwnerComponent weaponOwnerComponent = ArsenalComponents.WEAPON_OWNER_COMPONENT.get(user.getStackInHand(context.getHand()));
+                UUID weaponOwner = WeaponOwnerComponent.getOwner(user.getStackInHand(context.getHand()));
                 Skin currentSkin = Skin.fromString(ArsenalCosmetics.getSkin(context.getStack()));
 
                 if (currentSkin == null) {
                     currentSkin = Skin.DEFAULT;
                 }
 
-                ArsenalCosmetics.setSkin(weaponOwnerComponent.getOwner(), context.getStack(), Skin.getNext(currentSkin).getName());
+                ArsenalCosmetics.setSkin(weaponOwner, context.getStack(), Skin.getNext(currentSkin).getName());
                 context.getPlayer().playSound(SoundEvents.BLOCK_SMITHING_TABLE_USE, 0.5f, 1.0f);
 
                 return ActionResult.SUCCESS;
@@ -79,33 +84,60 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
         if (user instanceof AnchorOwner owner) {
-            boolean reeling = EnchantmentHelper.getLevel(ArsenalEnchantments.REELING, stack) > 0;
-            if (owner.arsenal$isAnchorActive(hand, reeling)) {
-                owner.arsenal$getAnchor(hand, reeling).setRecalled(user.getStackInHand(hand == Hand.MAIN_HAND ? Hand.OFF_HAND : Hand.MAIN_HAND).isOf(ArsenalItems.ANCHORBLADE));
-                return TypedActionResult.fail(stack);
+            boolean reeling = ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, world) > 0;
+            // Check both reeling states — the blade in flight might not match the current
+            // enchantment state of the item (e.g. if the stack changed), so try both.
+            // Prefer the state matching the current enchant, fall back to the other.
+            AnchorbladeEntity activeAnchor = owner.arsenal$getAnchor(hand, reeling);
+            if (activeAnchor == null || !activeAnchor.isAlive()) {
+                activeAnchor = owner.arsenal$getAnchor(hand, !reeling);
             }
-            int riptide = EnchantmentHelper.getRiptide(stack);
-            if (riptide <= 0 || user.isTouchingWaterOrRain()) {
-                if (!world.isClient) {
-                    stack.damage(1, user, p -> p.sendToolBreakStatus(user.getActiveHand()));
-                    if (riptide == 0) {
-                        AnchorbladeEntity anchorbladeEntity = new AnchorbladeEntity(world, user, stack);
-                        anchorbladeEntity.setVelocity(user, user.getPitch(), user.getYaw(), 0.0F, 2.5F + (float) riptide * 0.5F, 1.0F);
-                        owner.arsenal$setAnchor(hand, anchorbladeEntity);
-                        world.spawnEntity(anchorbladeEntity);
-                        world.playSoundFromEntity(null, anchorbladeEntity, ArsenalSounds.ITEM_ANCHORBLADE_THROW, SoundCategory.PLAYERS, 1.0F, 1.0F);
+            if (activeAnchor != null && activeAnchor.isAlive()) {
+                if (activeAnchor.isRecallable()) {
+                    // isRecallable() requires: Reeling enchantment, blade in ground,
+                    // and >= 30 ticks (~1.5 s) grounded. All three must pass.
+                    activeAnchor.setRecalled(true);
+                }
+                // Either way, suppress a new throw while a blade is still out.
+                return TypedActionResult.success(stack, world.isClient());
+            }
+            int riptide = world.getRegistryManager()
+                    .get(net.minecraft.registry.RegistryKeys.ENCHANTMENT)
+                    .getEntry(net.minecraft.enchantment.Enchantments.RIPTIDE)
+                    .map(entry -> EnchantmentHelper.getLevel(entry, stack))
+                    .orElse(0);
 
-                        return TypedActionResult.success(user.getStackInHand(hand));
-                    }
+            // FIX: Original logic had `return TypedActionResult.success(...)` inside `!world.isClient`,
+            // meaning the client never got a success result and the throw appeared to do nothing.
+            // The entity spawning must stay server-only, but the success return must happen on both sides.
+            // Also removed the `riptide <= 0 || isTouchingWaterOrRain()` outer condition that was
+            // preventing throws on dry land without riptide — the anchorblade should always throw.
+            if (riptide == 0) {
+                // Normal throw — always allowed
+                if (!world.isClient) {
+                    stack.damage(1, user, hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+                    AnchorbladeEntity anchorbladeEntity = new AnchorbladeEntity(world, user, stack);
+                    anchorbladeEntity.setVelocity(user, user.getPitch(), user.getYaw(), 0.0F, 2.5F, 1.0F);
+                    owner.arsenal$setAnchor(hand, anchorbladeEntity);
+                    world.spawnEntity(anchorbladeEntity);
+                    world.playSoundFromEntity(null, anchorbladeEntity, ArsenalSounds.ITEM_ANCHORBLADE_THROW, SoundCategory.PLAYERS, 1.0F, 1.0F);
                 }
                 user.incrementStat(Stats.USED.getOrCreateStat(this));
+                return TypedActionResult.success(user.getStackInHand(hand), world.isClient());
+            } else if (user.isTouchingWaterOrRain()) {
+                // Riptide throw — only in water/rain
+                if (!world.isClient) {
+                    stack.damage(1, user, hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+                }
+                user.incrementStat(Stats.USED.getOrCreateStat(this));
+                return TypedActionResult.success(user.getStackInHand(hand), world.isClient());
             }
         }
         return TypedActionResult.success(user.getStackInHand(hand));
     }
 
     @Override
-    public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
+    public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
         Skin skin = Skin.fromString(ArsenalCosmetics.getSkin(stack));
 
         if (skin != null && skin != Skin.DEFAULT) {
@@ -122,7 +154,7 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
             }
         }
 
-        super.appendTooltip(stack, world, tooltip, context);
+        super.appendTooltip(stack, context, tooltip, type);
     }
 
     @Override
@@ -134,7 +166,7 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
                 skin = toSkin;
             }
 
-            Pair<Integer, Integer> colorPair = skin.getRandomParticleColorPair();
+            Pair<Integer, Integer> colorPair = new Pair<>(skin.getFirstColor(), skin.getSecondColor());
             SweepParticleUtil.sendSweepPacketToClient(serverWorld, colorPair, player.getX() + -MathHelper.sin((float) (player.getYaw() * (Math.PI / 180F))), player.getBodyY(0.5D), player.getZ() + MathHelper.cos((float) (player.getYaw() * (Math.PI / 180F))));
         }
     }
@@ -154,48 +186,51 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
         super.inventoryTick(stack, world, entity, slot, selected);
 
         if (entity instanceof PlayerEntity player) {
-            WeaponOwnerComponent weaponOwnerComponent = ArsenalComponents.WEAPON_OWNER_COMPONENT.get(stack);
-            weaponOwnerComponent.setOwner(player.getUuid());
+            WeaponOwnerComponent.setOwner(stack, player.getUuid());
         }
     }
 
     public enum Skin {
-        DEFAULT(new int[]{0xFF2B2632}, new int[]{0xFF1B1B1B}, null, null),
-        LUXINTRUS(new int[]{0xFFE7761F, 0xFF37965B, 0xFFA51BB7}, new int[]{0xFFA84701, 0xFF115642, 0xFF671081}, "L'Ancre", "tooltip.arsenal.anchorblade_luxintrus"),
-        CARRION(new int[]{0xFFE9DFB8}, new int[]{0xFF9D806E}, null, null),
-        GILDED(new int[]{0xFFF1BC5A}, new int[]{0xFFE28634}, null, null),
-        WINSWEEP(new int[]{0xFFFFDC00, 0xFFC676F1}, new int[]{0xFFBE5F00, 0xFF7546A0}, "Wanchorblade", null),
-        AMBESSA(new int[]{0xFFA9A9A7}, new int[]{0xFF6A6D66}, "Crescent Blade", null);
+        // color, shadowColor, tooltipName, lore
+        // anchorbladeEntityModel: Identifier for the in-hand model used when the entity is rendered (thrown)
+        // chainTexture: Identifier for the entity/chain texture drawn between player and thrown blade
+        DEFAULT (0xFFD9D9D9, 0xFF7F8885, null, null,
+                Arsenal.id("item/anchorblade_in_hand"),           Arsenal.id("textures/entity/chain.png")),
+        LUXINTRUS(0xFF8E00FF, 0xFF5500AA, null, null,
+                Arsenal.id("item/anchorblade_luxintrus_in_hand"), Arsenal.id("textures/entity/chain_luxintrus.png")),
+        CARRION  (0xFFE9DFB8, 0xFF9D806E, null, null,
+                Arsenal.id("item/anchorblade_carrion_in_hand"),   Arsenal.id("textures/entity/chain_carrion.png")),
+        GILDED   (0xFFF1BC5A, 0xFFE28634, null, null,
+                Arsenal.id("item/anchorblade_gilded_in_hand"),    Arsenal.id("textures/entity/chain_gilded.png")),
+        WINSWEEP (0xFF00BFFF, 0xFF007BA3, null, null,
+                Arsenal.id("item/anchorblade_winsweep_in_hand"),  Arsenal.id("textures/entity/chain_winsweep.png")),
+        AMBESSA  (0xFFFF6600, 0xFFCC4400, null, null,
+                Arsenal.id("item/anchorblade_ambessa_in_hand"),   Arsenal.id("textures/entity/chain_ambessa.png"));
 
-        public final Identifier chainTexture;
-        public final Identifier anchorbladeEntityModel;
-        public final int[] colors;
-        public final int[] shadowColors;
-        public final @Nullable String tooltipName;
+        public final int color;
+        public final int shadowColor;
         public final @Nullable String lore;
-        public final Random random;
+        public final @Nullable String tooltipName;
+        /** Identifier for the BakedModel used when rendering the thrown AnchorbladeEntity. */
+        public final net.minecraft.util.Identifier anchorbladeEntityModel;
+        /** Identifier for the chain texture rendered between the player and the thrown blade. */
+        public final net.minecraft.util.Identifier chainTexture;
 
-        Skin(int[] colors, int[] shadowColors, @Nullable String tooltipName, @Nullable String lore) {
-            this.chainTexture = Arsenal.id(this.getName().equals("default") ? "textures/entity/chain.png" : "textures/entity/chain_" + this.getName() + ".png");
-            this.anchorbladeEntityModel = Arsenal.id(this.getName().equals("default") ? "item/anchorblade_in_hand" : "item/anchorblade_" + this.getName() + "_in_hand");
-            this.colors = colors;
-            this.shadowColors = shadowColors;
-            this.tooltipName = tooltipName;
+        Skin(int color, int shadowColor, @Nullable String tooltipName, @Nullable String lore,
+             net.minecraft.util.Identifier anchorbladeEntityModel, net.minecraft.util.Identifier chainTexture) {
+            this.color = color;
+            this.shadowColor = shadowColor;
             this.lore = lore;
-            this.random = new Random();
+            this.tooltipName = tooltipName;
+            this.anchorbladeEntityModel = anchorbladeEntityModel;
+            this.chainTexture = chainTexture;
         }
+
+        public int getFirstColor() { return this.color; }
+        public int getSecondColor() { return this.shadowColor; }
 
         public String getName() {
             return this.name().toLowerCase(Locale.ROOT);
-        }
-
-        public int getFirstColor() {
-            return this.colors[0];
-        }
-
-        public Pair<Integer, Integer> getRandomParticleColorPair() {
-            int i = this.random.nextInt(this.colors.length);
-            return new Pair<>(this.colors[i], this.shadowColors[i]);
         }
 
         @Nullable

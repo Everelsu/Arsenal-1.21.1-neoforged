@@ -3,24 +3,25 @@ package dev.doctor4t.arsenal.datagen;
 import dev.doctor4t.arsenal.index.ArsenalItems;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricRecipeProvider;
-import net.minecraft.data.server.recipe.RecipeJsonProvider;
+import net.minecraft.data.server.recipe.RecipeExporter;
 import net.minecraft.data.server.recipe.ShapedRecipeJsonBuilder;
 import net.minecraft.item.Items;
 import net.minecraft.recipe.book.RecipeCategory;
+import net.minecraft.registry.RegistryWrapper;
 
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
 
 public class ArsenalRecipeGen extends FabricRecipeProvider {
-    public ArsenalRecipeGen(FabricDataOutput output) {
-        super(output);
+    public ArsenalRecipeGen(FabricDataOutput output, CompletableFuture<RegistryWrapper.WrapperLookup> registriesFuture) {
+        super(output, registriesFuture);
     }
 
     @Override
-    public void generate(Consumer<RecipeJsonProvider> exporter) {
+    public void generate(RecipeExporter exporter) {
         this.offerWeaponRack(exporter);
     }
 
-    public void offerWeaponRack(Consumer<RecipeJsonProvider> exporter) {
+    public void offerWeaponRack(RecipeExporter exporter) {
         ShapedRecipeJsonBuilder.create(RecipeCategory.DECORATIONS, ArsenalItems.WEAPON_RACK)
                 .input('S', Items.STICK)
                 .input('I', Items.IRON_INGOT)

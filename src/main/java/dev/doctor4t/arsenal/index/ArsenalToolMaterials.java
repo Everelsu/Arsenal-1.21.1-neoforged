@@ -1,60 +1,42 @@
 package dev.doctor4t.arsenal.index;
 
-import net.fabricmc.yarn.constants.MiningLevels;
-import net.minecraft.item.Items;
+import net.minecraft.block.Block;
 import net.minecraft.item.ToolMaterial;
 import net.minecraft.recipe.Ingredient;
-import net.minecraft.util.Lazy;
-
-import java.util.function.Supplier;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.registry.tag.TagKey;
 
 public enum ArsenalToolMaterials implements ToolMaterial {
-    SCYTHE(MiningLevels.NETHERITE, 2031, 9.0F, 4.0F, 28, () -> Ingredient.ofItems(Items.IRON_INGOT)),
-    ANCHORBLADE(MiningLevels.NETHERITE, 2031, 9.0F, 4.0F, 28, () -> Ingredient.ofItems(Items.IRON_INGOT));
+    SCYTHE(2031, 9.0F, 4.0F, 28, () -> Ingredient.ofItems(net.minecraft.item.Items.IRON_INGOT)),
+    ANCHORBLADE(2031, 9.0F, 4.0F, 28, () -> Ingredient.ofItems(net.minecraft.item.Items.IRON_INGOT));
 
-    private final int miningLevel;
-    private final int itemDurability;
-    private final float miningSpeed;
+    private final int durability;
+    private final float miningSpeedMultiplier;
     private final float attackDamage;
     private final int enchantability;
-    private final Lazy<Ingredient> repairIngredient;
+    private final java.util.function.Supplier<Ingredient> repairIngredient;
 
-    ArsenalToolMaterials(int miningLevel, int itemDurability, float miningSpeed, float attackDamage, int enchantability, Supplier<Ingredient> repairIngredient) {
-        this.miningLevel = miningLevel;
-        this.itemDurability = itemDurability;
-        this.miningSpeed = miningSpeed;
-        this.attackDamage = attackDamage;
-        this.enchantability = enchantability;
-        this.repairIngredient = new Lazy<>(repairIngredient);
+    ArsenalToolMaterials(int durability, float miningSpeedMultiplier, float attackDamage,
+                         int enchantability, java.util.function.Supplier<Ingredient> repairIngredient) {
+        this.durability          = durability;
+        this.miningSpeedMultiplier = miningSpeedMultiplier;
+        this.attackDamage        = attackDamage;
+        this.enchantability      = enchantability;
+        this.repairIngredient    = repairIngredient;
     }
 
-    @Override
-    public int getDurability() {
-        return this.itemDurability;
-    }
+    @Override public int getDurability()               { return durability; }
+    @Override public float getMiningSpeedMultiplier()  { return miningSpeedMultiplier; }
+    @Override public float getAttackDamage()           { return attackDamage; }
+    @Override public int getEnchantability()           { return enchantability; }
+    @Override public Ingredient getRepairIngredient()  { return repairIngredient.get(); }
 
+    // FIX: getInverseTag() returns TagKey<Block>, not TagKey<Item>.
+    // It represents blocks this material is INCORRECT for (wrong mining tier).
+    // Arsenal weapons aren't tier-gated mining tools, so we use INCORRECT_FOR_NETHERITE_TOOL
+    // (the highest tier) so they never incorrectly suppress block breaking feedback.
     @Override
-    public float getMiningSpeedMultiplier() {
-        return this.miningSpeed;
-    }
-
-    @Override
-    public float getAttackDamage() {
-        return this.attackDamage;
-    }
-
-    @Override
-    public int getMiningLevel() {
-        return this.miningLevel;
-    }
-
-    @Override
-    public int getEnchantability() {
-        return this.enchantability;
-    }
-
-    @Override
-    public Ingredient getRepairIngredient() {
-        return this.repairIngredient.get();
+    public TagKey<Block> getInverseTag() {
+        return BlockTags.INCORRECT_FOR_NETHERITE_TOOL;
     }
 }

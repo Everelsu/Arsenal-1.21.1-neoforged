@@ -36,14 +36,13 @@
 	"accessWidener" : "arsenal.accesswidener",
 	"custom": {
 		"cardinal-components": [
-			"arsenal:back_weapon",
-			"arsenal:weapon_skin"
+			"arsenal:back_weapon"
 		]
 	},
 	"depends": {
 		"fabricloader": ">=0.16.9",
-		"minecraft": "~1.20.1",
-		"java": ">=17",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
 		"fabric-api": "*",
 		"ratatouille": ">=1.0.8-1.20.1"
 	}

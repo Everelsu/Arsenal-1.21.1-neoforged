@@ -1,30 +1,37 @@
 package dev.doctor4t.arsenal.index;
 
 import dev.doctor4t.arsenal.Arsenal;
-import dev.doctor4t.arsenal.enchantment.ReelingEnchantment;
-import dev.doctor4t.arsenal.enchantment.SpewingEnchantment;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.world.World;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+public final class ArsenalEnchantments {
+    public static final RegistryKey<Enchantment> SPEWING =
+            RegistryKey.of(RegistryKeys.ENCHANTMENT, Arsenal.id("spewing"));
+    public static final RegistryKey<Enchantment> REELING =
+            RegistryKey.of(RegistryKeys.ENCHANTMENT, Arsenal.id("reeling"));
 
-public interface ArsenalEnchantments {
-    Map<Enchantment, Identifier> ENCHANTMENTS = new LinkedHashMap<>();
+    private ArsenalEnchantments() {}
 
-    Enchantment SPEWING = createEnchantment("spewing", new SpewingEnchantment(Enchantment.Rarity.RARE, EquipmentSlot.MAINHAND));
-    Enchantment REELING = createEnchantment("reeling", new ReelingEnchantment(Enchantment.Rarity.RARE, EquipmentSlot.MAINHAND));
-//    Enchantment HEFT = createEnchantment("heft", new HeftEnchantment(Enchantment.Rarity.RARE, EquipmentSlot.MAINHAND));
-
-    private static Enchantment createEnchantment(String name, Enchantment enchantment) {
-        ENCHANTMENTS.put(enchantment, new Identifier(Arsenal.MOD_ID, name));
-        return enchantment;
+    public static int getLevel(RegistryKey<Enchantment> key, ItemStack stack, World world) {
+        // DynamicRegistryManager.get() returns the Registry<Enchantment>,
+        // then getEntry(RegistryKey) gives the RegistryEntry for EnchantmentHelper.
+        return world.getRegistryManager()
+                .get(RegistryKeys.ENCHANTMENT)
+                .getEntry(key)
+                .map(entry -> EnchantmentHelper.getLevel(entry, stack))
+                .orElse(0);
     }
 
-    static void initialize() {
-        ENCHANTMENTS.keySet().forEach(enchantment -> Registry.register(Registries.ENCHANTMENT, ENCHANTMENTS.get(enchantment), enchantment));
+    public static int getEquipmentLevel(RegistryKey<Enchantment> key, LivingEntity entity) {
+        return entity.getWorld().getRegistryManager()
+                .get(RegistryKeys.ENCHANTMENT)
+                .getEntry(key)
+                .map(entry -> EnchantmentHelper.getEquipmentLevel(entry, entity))
+                .orElse(0);
     }
 }

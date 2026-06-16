@@ -38,9 +38,10 @@ public class AnchorBladeEntityModel extends EntityModel<AnchorbladeEntity> {
         return TexturedModelData.of(modelData, 64, 64);
     }
 
+    // FIX: render signature changed in 1.21.1 — color is now a packed int, not 4 floats
     @Override
-    public void render(MatrixStack matrices, VertexConsumer vertexConsumer, int light, int overlay, float red, float green, float blue, float alpha) {
-        this.bone.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+    public void render(MatrixStack matrices, VertexConsumer vertexConsumer, int light, int overlay, int color) {
+        this.bone.render(matrices, vertexConsumer, light, overlay, color);
     }
 
     public Vector3f getAttachmentPosition() {

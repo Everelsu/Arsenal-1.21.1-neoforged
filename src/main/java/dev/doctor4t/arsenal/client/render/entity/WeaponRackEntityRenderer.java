@@ -5,6 +5,7 @@ import dev.doctor4t.arsenal.entity.WeaponRackEntity;
 import dev.doctor4t.arsenal.index.ArsenalTags;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.model.loading.v1.FabricBakedModelManager;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.TexturedRenderLayers;
@@ -16,7 +17,6 @@ import net.minecraft.client.render.item.ItemRenderer;
 import net.minecraft.client.render.model.BakedModelManager;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.client.util.ModelIdentifier;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EntityType;
 import net.minecraft.item.ItemStack;
@@ -25,7 +25,10 @@ import net.minecraft.util.math.*;
 
 @Environment(EnvType.CLIENT)
 public class WeaponRackEntityRenderer<T extends WeaponRackEntity> extends EntityRenderer<T> {
-    public static final ModelIdentifier MODEL = new ModelIdentifier(Arsenal.MOD_ID, "weapon_rack", "");
+    // "block/" prefix so addModels() resolves to assets/arsenal/models/block/weapon_rack.json.
+    // Without the prefix, the lookup path is assets/arsenal/models/weapon_rack.json which doesn't exist,
+    // causing the model to fall back to the missing-texture checkerboard.
+    public static final Identifier MODEL = Arsenal.id("block/weapon_rack");
     private final ItemRenderer itemRenderer;
     private final BlockRenderManager blockRenderManager;
 
@@ -67,7 +70,7 @@ public class WeaponRackEntityRenderer<T extends WeaponRackEntity> extends Entity
                             matrices.peek(),
                             vertexConsumerProvider.getBuffer(TexturedRenderLayers.getEntityCutout()),
                             null,
-                            bakedModelManager.getModel(MODEL),
+                            ((FabricBakedModelManager) bakedModelManager).getModel(MODEL),
                             1.0F,
                             1.0F,
                             1.0F,
@@ -96,7 +99,7 @@ public class WeaponRackEntityRenderer<T extends WeaponRackEntity> extends Entity
 
             matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(zRot));
 
-            float offset = MathHelper.hashCode(itemFrameEntity.getBlockX(), itemFrameEntity.getBlockY(), itemFrameEntity.getBlockZ()) * 0.00000000000000001f; // offset to avoid z fighting
+            float offset = MathHelper.hashCode(itemFrameEntity.getBlockX(), itemFrameEntity.getBlockY(), itemFrameEntity.getBlockZ()) * 0.00000000000000001f;
             if (bl) {
                 matrices.translate(0.0F + offset, 0.0F + offset, 0.4375F + offset);
             } else {

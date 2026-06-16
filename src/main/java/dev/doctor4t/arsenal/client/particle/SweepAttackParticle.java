@@ -3,12 +3,13 @@ package dev.doctor4t.arsenal.client.particle;
 import dev.doctor4t.arsenal.client.particle.type.SweepParticleType;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider;
 import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.ParticleTextureSheet;
 import net.minecraft.client.particle.SpriteBillboardParticle;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.DefaultParticleType;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
@@ -42,18 +43,21 @@ public class SweepAttackParticle extends SpriteBillboardParticle {
     }
 
     @Environment(EnvType.CLIENT)
-    public static class Factory implements ParticleFactory<DefaultParticleType> {
+    public static class Factory implements ParticleFactory<SweepParticleType> {
         private final SpriteProvider spriteProvider;
 
-        public Factory(SpriteProvider spriteProvider) {
+        // FabricSpriteProvider extends SpriteProvider, so this accepts what the
+        // PendingParticleFactory registry injects while remaining compatible with
+        // the rest of the particle internals that use SpriteProvider.
+        public Factory(FabricSpriteProvider spriteProvider) {
             this.spriteProvider = spriteProvider;
         }
 
         @Override
-        public @Nullable SweepAttackParticle createParticle(DefaultParticleType parameters, ClientWorld world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
+        public @Nullable SweepAttackParticle createParticle(SweepParticleType parameters, ClientWorld world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
             SweepAttackParticle instance = new SweepAttackParticle(world, x, y, z, this.spriteProvider);
-            if (parameters instanceof SweepParticleType sweepParameters && sweepParameters.initialData != null) {
-                Color color = new Color(sweepParameters.initialData.color, true);
+            if (parameters.initialData != null) {
+                Color color = new Color(parameters.initialData.color, true);
                 instance.setColor(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
                 instance.setAlpha(color.getAlpha() / 255f);
             }

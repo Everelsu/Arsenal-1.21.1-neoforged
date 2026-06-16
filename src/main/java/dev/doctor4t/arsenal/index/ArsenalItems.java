@@ -4,7 +4,6 @@ import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.item.AnchorbladeItem;
 import dev.doctor4t.arsenal.item.ScytheItem;
 import dev.doctor4t.arsenal.item.WeaponRackItem;
-import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.item.Item;
@@ -22,7 +21,7 @@ public interface ArsenalItems {
     Map<Item, Identifier> ITEMS = new LinkedHashMap<>();
 
     Item SCYTHE = create("scythe", new ScytheItem(ArsenalToolMaterials.SCYTHE, 5.0f, -3.0f, new Item.Settings().rarity(Rarity.COMMON)));
-    Item ANCHORBLADE = create("anchorblade", new AnchorbladeItem(ArsenalToolMaterials.ANCHORBLADE, 5, -3.0f, new FabricItemSettings().rarity(Rarity.COMMON)));
+    Item ANCHORBLADE = create("anchorblade", new AnchorbladeItem(ArsenalToolMaterials.ANCHORBLADE, 5, -3.0f, new Item.Settings().rarity(Rarity.COMMON)));
     Item WEAPON_RACK = create("weapon_rack", new WeaponRackItem(new Item.Settings()));
 
     static <T extends Item> T create(String name, T item) {

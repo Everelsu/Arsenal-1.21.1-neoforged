@@ -4,9 +4,7 @@ import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
 import dev.doctor4t.arsenal.entity.BloodScytheEntity;
 import dev.doctor4t.arsenal.entity.WeaponRackEntity;
-import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
 import net.minecraft.registry.Registries;
@@ -19,16 +17,34 @@ import java.util.Map;
 public interface ArsenalEntities {
     Map<EntityType<? extends Entity>, Identifier> ENTITIES = new LinkedHashMap<>();
 
-    EntityType<BloodScytheEntity> BLOOD_SCYTHE = createEntity("blood_scythe", FabricEntityTypeBuilder.<BloodScytheEntity>create(SpawnGroup.MISC, BloodScytheEntity::new).disableSaving().dimensions(EntityDimensions.changing(5.0f, 0.2f)).build());
-    EntityType<AnchorbladeEntity> ANCHORBLADE = createEntity("anchorblade", FabricEntityTypeBuilder.<AnchorbladeEntity>create(SpawnGroup.MISC, AnchorbladeEntity::new).disableSaving().dimensions(EntityDimensions.fixed(1.2f, 1.2f)).trackRangeChunks(128).build());
-    EntityType<WeaponRackEntity> WEAPON_RACK = createEntity("weapon_rack", FabricEntityTypeBuilder.<WeaponRackEntity>create(SpawnGroup.MISC, WeaponRackEntity::new).dimensions(EntityDimensions.fixed(0.4F, 0.4F)).trackRangeChunks(10).trackedUpdateRate(Integer.MAX_VALUE).build());
+    // FIX: dimensions() takes (float width, float height) directly.
+    // FIX: trackRangeChunks/trackRangeBlocks both don't exist in 1.21.1's EntityType.Builder.
+    // The tracking range is now configured via the entity's SpawnGroup or left at the default.
+    // trackedUpdateRate() is also removed. Simply omit these builder calls.
+    EntityType<BloodScytheEntity> BLOOD_SCYTHE = createEntity("blood_scythe",
+            EntityType.Builder.<BloodScytheEntity>create(BloodScytheEntity::new, SpawnGroup.MISC)
+                    .disableSaving()
+                    .dimensions(5.0f, 0.2f)
+                    .build(Arsenal.MOD_ID + ":blood_scythe"));
+
+    EntityType<AnchorbladeEntity> ANCHORBLADE = createEntity("anchorblade",
+            EntityType.Builder.<AnchorbladeEntity>create(AnchorbladeEntity::new, SpawnGroup.MISC)
+                    .disableSaving()
+                    .dimensions(1.2f, 1.2f)
+                    .build(Arsenal.MOD_ID + ":anchorblade"));
+
+    EntityType<WeaponRackEntity> WEAPON_RACK = createEntity("weapon_rack",
+            EntityType.Builder.<WeaponRackEntity>create(WeaponRackEntity::new, SpawnGroup.MISC)
+                    .dimensions(0.4F, 0.4F)
+                    .build(Arsenal.MOD_ID + ":weapon_rack"));
 
     private static <T extends EntityType<? extends Entity>> T createEntity(String name, T entity) {
-        ENTITIES.put(entity, new Identifier(Arsenal.MOD_ID, name));
+        ENTITIES.put(entity, Identifier.of(Arsenal.MOD_ID, name));
         return entity;
     }
 
     static void initialize() {
-        ENTITIES.keySet().forEach(entityType -> Registry.register(Registries.ENTITY_TYPE, ENTITIES.get(entityType), entityType));
+        ENTITIES.keySet().forEach(entityType ->
+                Registry.register(Registries.ENTITY_TYPE, ENTITIES.get(entityType), entityType));
     }
 }

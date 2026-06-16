@@ -6,6 +6,7 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.mob.IllagerEntity;
 import net.minecraft.entity.mob.VindicatorEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.World;
@@ -20,7 +21,6 @@ public abstract class VindicatorEntityMixin extends IllagerEntity {
     protected VindicatorEntityMixin(EntityType<? extends IllagerEntity> entityType, World world) {
         super(entityType, world);
     }
-
 
     @Unique
     private void randomlyGiveScythe(Random random) {
@@ -38,9 +38,9 @@ public abstract class VindicatorEntityMixin extends IllagerEntity {
         this.randomlyGiveScythe(random);
     }
 
+    // In MC 1.21.1 addBonusForWave gained a ServerWorld as its first parameter.
     @Inject(method = "addBonusForWave", at = @At(value = "TAIL"))
-    public void arsenal$equipScytheOnRaidVindicators(int wave, boolean unused, CallbackInfo ci) {
-        this.randomlyGiveScythe(random);
+    public void arsenal$equipScytheOnRaidVindicators(ServerWorld world, int wave, boolean unused, CallbackInfo ci) {
+        this.randomlyGiveScythe(this.getRandom());
     }
-
 }

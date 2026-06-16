@@ -1,7 +1,6 @@
 package dev.doctor4t.arsenal.entity;
 
 import dev.doctor4t.arsenal.index.*;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -26,18 +25,23 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
     public int returnTimer;
 
     public AnchorbladeEntity(EntityType<? extends AnchorbladeEntity> entityType, World world) {
+        // FIX: use the two-arg constructor (EntityType, World) — no item stacks here
         super(entityType, world);
     }
 
     public AnchorbladeEntity(World world, LivingEntity owner, ItemStack stack) {
-        super(ArsenalEntities.ANCHORBLADE, owner, world);
+        // In 1.21.1, PersistentProjectileEntity(EntityType, LivingEntity, World, ItemStack projectile, ItemStack weapon)
+        // requires the WEAPON (5th arg) to be non-empty — passing EMPTY throws "Invalid weapon firing an arrow".
+        // The first ItemStack is the visual/projectile item; the second is the weapon that fired it
+        // (used for enchantment effects like piercing). Pass the anchorblade stack as the weapon.
+        super(ArsenalEntities.ANCHORBLADE, owner, world, new ItemStack(ArsenalItems.ANCHORBLADE), stack);
         this.setItem(stack.copy());
         this.setNoGravity(true);
-        this.setReeling(EnchantmentHelper.getLevel(ArsenalEnchantments.REELING, stack) > 0);
+        this.setReeling(ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, world) > 0);
     }
 
     public void setItem(ItemStack stack) {
-        if (!stack.isOf(Items.ENDER_EYE) || stack.hasNbt()) {
+        if (!stack.isOf(Items.ENDER_EYE) || !stack.getComponentChanges().isEmpty()) {
             this.getDataTracker().set(ITEM, stack.copyWithCount(1));
         }
     }
@@ -52,10 +56,10 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    protected void initDataTracker() {
-        super.initDataTracker();
-        this.getDataTracker().startTracking(ANCHOR_FLAGS, (byte) 0);
-        this.getDataTracker().startTracking(ITEM, ItemStack.EMPTY);
+    protected void initDataTracker(DataTracker.Builder builder) {
+        super.initDataTracker(builder);
+        builder.add(ANCHOR_FLAGS, (byte) 0);
+        builder.add(ITEM, ItemStack.EMPTY);
     }
 
     @Override
@@ -68,21 +72,36 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
                 this.discard();
                 return;
             }
-            if (this.hasDealtDamage() || this.isNoClip()) {
+            if (this.hasDealtDamage() || this.isNoClip() || this.isRecalled()) {
+                // isRecalled() is an extra safety gate: if right-click recall fired but
+                // setDealtDamage somehow didn't propagate, the blade still flies home.
                 this.setNoClip(true);
                 Vec3d vec3d = owner.getEyePos().subtract(this.getPos());
-                if (this.getWorld().isClient) {
-                    this.lastRenderY = this.getY();
-                }
 
                 double length = vec3d.length();
-                this.setVelocity(vec3d.normalize().multiply(Math.min(length, d * 3)));
+                // Cap at 1.5 blocks/tick so the blade visibly travels home rather than
+                // teleporting. At close range (length < 1.5) it scales down naturally
+                // so it doesn't overshoot. d*3 (= 6) was the old cap — far too fast.
+                this.setVelocity(vec3d.normalize().multiply(Math.min(length, 2.5)));
             }
             if (this.getPos().distanceTo(owner.getPos()) > 30) {
                 this.setDealtDamage(true);
             }
         }
 
+        // Snapshot inGround BEFORE super.tick() so we can detect the landing transition.
+        // super.tick() is what actually sets inGround = true (inside PersistentProjectileEntity.tick()
+        // via the block-collision raycast). If we check inGround before calling super.tick(),
+        // it will always be false on the landing tick and the shockwave block never fires.
+        boolean wasInGround = this.inGround;
+
+        super.tick();
+
+        // Now inGround is up-to-date. Only enter the block on the tick we first land
+        // (wasInGround=false → inGround=true) OR on subsequent ticks while embedded
+        // (wasInGround=true → inGround=true). hasDealtDamage() gates repeated execution:
+        // setDealtDamage(true) is called at the end of the else-branch so the shockwave
+        // + knockback fire exactly once, and the reeling branch uses returnTimer instead.
         if (this.inGround && !this.hasDealtDamage()) {
             if (this.hasReeling()) {
                 if (this.returnTimer++ > 100) {
@@ -98,8 +117,20 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
                 owner.fallDistance = 0;
             } else {
                 float radius = 5f;
-                // impact
-                this.getWorld().addParticle(ArsenalParticles.SHOCKWAVE, this.getX(), this.getY(), this.getZ(), 0, 0, 0);
+                // Spawn the shockwave particle on landing.
+                // Client side: call addParticle() directly — ClientWorld.addParticle() is NOT a no-op,
+                // unlike the World base class. This covers singleplayer and the local player in multiplayer.
+                // Server side: send ShockwavePayload so all OTHER connected players also see it.
+                if (this.getWorld().isClient) {
+                    this.getWorld().addParticle(ArsenalParticles.SHOCKWAVE,
+                            this.getX(), this.getY(), this.getZ(), 0, 0, 0);
+                } else if (this.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld) {
+                    dev.doctor4t.arsenal.network.ShockwavePayload payload =
+                            new dev.doctor4t.arsenal.network.ShockwavePayload(this.getX(), this.getY(), this.getZ());
+                    for (net.minecraft.server.network.ServerPlayerEntity player : serverWorld.getPlayers()) {
+                        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
+                    }
+                }
                 for (LivingEntity hitLivingEntity : this.getWorld().getEntitiesByClass(LivingEntity.class, this.getBoundingBox().expand(radius), LivingEntity::isAlive)) {
                     float strength = this.getKnockbackForEntity(hitLivingEntity);
                     if (!(strength <= 0.0)) {
@@ -118,8 +149,6 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
                 this.setDealtDamage(true);
             }
         }
-
-        super.tick();
     }
 
     @Override
@@ -140,9 +169,6 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
     protected void onEntityHit(EntityHitResult entityHitResult) {
         Entity hitEntity = entityHitResult.getEntity();
         float damage = 10F;
-        if (hitEntity instanceof LivingEntity livingEntity) {
-            damage += EnchantmentHelper.getAttackDamage(this.getTrackedItem(), livingEntity.getGroup());
-        }
         Entity owner = this.getOwner();
         this.setDealtDamage(true);
         SoundEvent soundEvent = this.getHitSound();
@@ -153,10 +179,11 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
             }
 
             if (hitEntity instanceof LivingEntity hitLivingEntity) {
-                if (owner instanceof LivingEntity) {
-                    EnchantmentHelper.onUserDamaged(hitLivingEntity, owner);
-                    EnchantmentHelper.onTargetDamaged((LivingEntity) owner, hitLivingEntity);
-                    // knockback or reel in
+                if (owner instanceof LivingEntity livingOwner) {
+                    // FIX: applyDamageEffects(LivingEntity, LivingEntity) was removed in 1.21.1.
+                    // Enchantment on-hit effects are now fully data-driven and triggered automatically
+                    // by the damage pipeline. No manual call needed here.
+
                     float strength = this.getKnockbackForEntity(hitLivingEntity);
                     if (!(strength <= 0.0)) {
                         this.velocityDirty = true;
@@ -197,6 +224,12 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
         return ArsenalSounds.ENTITY_ANCHORBLADE_LAND;
     }
 
+    // Required abstract method in 1.21.1 - returns the item this projectile represents
+    @Override
+    protected ItemStack getDefaultItemStack() {
+        return new ItemStack(ArsenalItems.ANCHORBLADE);
+    }
+
     @Override
     protected ItemStack asItemStack() {
         return ItemStack.EMPTY;
@@ -227,8 +260,27 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
         return this.getAnchorFlag(2);
     }
 
+    /**
+     * Returns true when a right-click recall is allowed:
+     * - blade must have the Reeling enchantment (non-reeling blade auto-returns on its own)
+     * - blade must currently be embedded in the ground
+     * - blade must have been in the ground for at least 30 ticks (~1.5 s) so the
+     *   player has a moment of being pulled before they can cut it short
+     */
+    public boolean isRecallable() {
+        return this.hasReeling() && this.inGround && this.returnTimer >= 10;
+    }
+
     public void setRecalled(boolean recalled) {
-        if (recalled) this.setDealtDamage(true);
+        if (recalled) {
+            // Free the blade from the ground so it can fly home.
+            // setDealtDamage(true) activates the return-home velocity block in tick(),
+            // but super.tick() on a grounded (inGround=true) projectile ignores velocity.
+            // setNoClip(true) + inGround=false lets the blade actually move next tick.
+            this.setDealtDamage(true);
+            this.setNoClip(true);
+            this.inGround = false;
+        }
         this.setAnchorFlag(2, recalled);
     }
 

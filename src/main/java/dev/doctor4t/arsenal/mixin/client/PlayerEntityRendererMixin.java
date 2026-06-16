@@ -10,7 +10,6 @@ import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.render.entity.model.BipedEntityModel;
 import net.minecraft.client.render.entity.model.PlayerEntityModel;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import org.spongepowered.asm.mixin.Mixin;
@@ -29,7 +28,7 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<Abs
     private static void arsenal$swordPoses(AbstractClientPlayerEntity player, Hand hand, CallbackInfoReturnable<BipedEntityModel.ArmPose> cir) {
         ItemStack stack = player.getStackInHand(hand);
         if (stack.isOf(ArsenalItems.ANCHORBLADE)) {
-            boolean reeling = EnchantmentHelper.getLevel(ArsenalEnchantments.REELING, stack) > 0;
+            boolean reeling = ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, player.getWorld()) > 0;
             if (player instanceof AnchorOwner owner && owner.arsenal$isAnchorActive(hand, reeling)) {
                 cir.setReturnValue(BipedEntityModel.ArmPose.EMPTY);
             }

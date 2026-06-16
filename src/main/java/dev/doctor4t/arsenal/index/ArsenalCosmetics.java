@@ -1,7 +1,7 @@
 package dev.doctor4t.arsenal.index;
 
 import dev.doctor4t.arsenal.Arsenal;
-import dev.doctor4t.arsenal.cca.ArsenalComponents;
+import dev.doctor4t.arsenal.cca.WeaponOwnerComponent;
 import dev.doctor4t.arsenal.util.WeaponSkinsSupporterData;
 import dev.upcraft.datasync.api.DataSyncAPI;
 import dev.upcraft.datasync.api.SyncToken;
@@ -18,7 +18,7 @@ public interface ArsenalCosmetics {
     SyncToken<WeaponSkinsSupporterData> WEAPON_SKINS_DATA = DataSyncAPI.register(WeaponSkinsSupporterData.class, WEAPON_SKINS_DATA_ID, WeaponSkinsSupporterData.CODEC);
 
     static String getSkin(ItemStack itemStack) {
-        UUID owner = ArsenalComponents.WEAPON_OWNER_COMPONENT.get(itemStack).getOwner();
+        UUID owner = WeaponOwnerComponent.getOwner(itemStack);
         String itemName = itemStack.getItem().getName().getString().toLowerCase(Locale.ROOT);
         String stackName = itemStack.getName().getString().toLowerCase(Locale.ROOT);
 

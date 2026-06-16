@@ -11,11 +11,10 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 public class BloodScytheEntityRenderer<T extends BloodScytheEntity> extends EntityRenderer<T> {
-    public static final Identifier TEXTURE = new Identifier(Arsenal.MOD_ID, "textures/entity/blood_scythe.png");
+    public static final Identifier TEXTURE = Identifier.of(Arsenal.MOD_ID, "textures/entity/blood_scythe.png");
 
     public BloodScytheEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
@@ -41,8 +40,13 @@ public class BloodScytheEntityRenderer<T extends BloodScytheEntity> extends Enti
         return TEXTURE;
     }
 
-    public void vertex(Matrix4f positionMatrix, Matrix3f normalMatrix, VertexConsumer vertexConsumer, int x, int y, int z, float u, float v, int normalX, int normalZ, int normalY, int light) {
-        vertexConsumer.vertex(positionMatrix, x, y, z).color(255, 255, 255, 255).texture(u, v).overlay(OverlayTexture.DEFAULT_UV).light(light).normal(normalMatrix, normalX, normalY, normalZ).next();
+    // FIX: normal() now takes MatrixStack.Entry, not separate Matrix3f; also removed .next()
+    public void vertex(MatrixStack.Entry entry, VertexConsumer vertexConsumer, int x, int y, int z, float u, float v, int normalX, int normalZ, int normalY, int light) {
+        vertexConsumer.vertex(entry.getPositionMatrix(), x, y, z)
+                .color(255, 255, 255, 255)
+                .texture(u, v)
+                .overlay(OverlayTexture.DEFAULT_UV)
+                .light(light)
+                .normal(entry, normalX, normalY, normalZ);
     }
 }
-

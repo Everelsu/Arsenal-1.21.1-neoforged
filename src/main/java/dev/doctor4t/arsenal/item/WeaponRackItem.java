@@ -1,13 +1,14 @@
 package dev.doctor4t.arsenal.item;
 
 import dev.doctor4t.arsenal.entity.WeaponRackEntity;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.AbstractDecorationEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemUsageContext;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -33,9 +34,11 @@ public class WeaponRackItem extends Item {
             AbstractDecorationEntity abstractDecorationEntity;
             abstractDecorationEntity = new WeaponRackEntity(world, blockPos2, direction);
 
-            NbtCompound nbtCompound = itemStack.getNbt();
-            if (nbtCompound != null) {
-                EntityType.loadFromEntityNbt(world, playerEntity, abstractDecorationEntity, nbtCompound);
+            var entityData = itemStack.get(DataComponentTypes.ENTITY_DATA);
+            if (entityData != null) {
+                // FIX: EntityType.loadFromEntityNbt() now expects NbtComponent, not NbtCompound.
+                // entityData is already an NbtComponent — pass it directly.
+                EntityType.loadFromEntityNbt(world, playerEntity, abstractDecorationEntity, entityData);
             }
 
             if (abstractDecorationEntity.canStayAttached()) {

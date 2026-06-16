@@ -18,8 +18,6 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
-import org.joml.Matrix3f;
-import org.joml.Matrix4f;
 
 public class ArsenalTridentEntityRenderer extends EntityRenderer<TridentEntity> {
     private final ItemRenderer itemRenderer;
@@ -52,8 +50,15 @@ public class ArsenalTridentEntityRenderer extends EntityRenderer<TridentEntity> 
         matrices.pop();
     }
 
-    private void vertex(Vec3d vec, VertexConsumer vertexConsumer, float u, float v, Matrix4f modelMatrix, Matrix3f normal, int light) {
-        vertexConsumer.vertex(modelMatrix, (float) vec.x, (float) vec.y, (float) vec.z).color(255, 255, 255, 255).texture(u, v).overlay(OverlayTexture.DEFAULT_UV).light(light).normal(normal, 0, 1, 0).next();
+    // FIX: normal() now takes MatrixStack.Entry, not Matrix3f; also removed .next()
+    // (Unused here but kept for parity — the chain rendering that used this was removed upstream)
+    private void vertex(Vec3d vec, VertexConsumer vertexConsumer, float u, float v, MatrixStack.Entry entry, int light) {
+        vertexConsumer.vertex(entry.getPositionMatrix(), (float) vec.x, (float) vec.y, (float) vec.z)
+                .color(255, 255, 255, 255)
+                .texture(u, v)
+                .overlay(OverlayTexture.DEFAULT_UV)
+                .light(light)
+                .normal(entry, 0, 1, 0);
     }
 
     @Override

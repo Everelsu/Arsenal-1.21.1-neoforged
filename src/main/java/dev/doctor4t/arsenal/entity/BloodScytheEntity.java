@@ -3,6 +3,7 @@ package dev.doctor4t.arsenal.entity;
 import com.google.common.collect.Sets;
 import dev.doctor4t.arsenal.index.ArsenalDamageTypes;
 import dev.doctor4t.arsenal.index.ArsenalEntities;
+import dev.doctor4t.arsenal.index.ArsenalItems;
 import dev.doctor4t.arsenal.index.ArsenalParticles;
 import dev.doctor4t.arsenal.index.ArsenalSounds;
 import net.minecraft.entity.EntityType;
@@ -24,11 +25,21 @@ public class BloodScytheEntity extends PersistentProjectileEntity {
     public final List<LivingEntity> hitEntities = new ArrayList<>();
 
     public BloodScytheEntity(EntityType<? extends PersistentProjectileEntity> entityType, World world) {
+        // FIX: use the two-arg constructor (EntityType, World) — correct for 1.21.1
         super(entityType, world);
     }
 
     public BloodScytheEntity(World world, LivingEntity owner) {
-        super(ArsenalEntities.BLOOD_SCYTHE, owner, world);
+        // In 1.21.1, PersistentProjectileEntity requires the 5th arg (weapon) to be non-empty.
+        // Passing ItemStack.EMPTY throws "Invalid weapon firing an arrow".
+        // A fresh scythe stack is sufficient — the weapon arg is only used for enchantment dispatch.
+        super(ArsenalEntities.BLOOD_SCYTHE, owner, world, new ItemStack(ArsenalItems.SCYTHE), new ItemStack(ArsenalItems.SCYTHE));
+    }
+
+    // Required abstract method in 1.21.1
+    @Override
+    protected ItemStack getDefaultItemStack() {
+        return new ItemStack(ArsenalItems.SCYTHE);
     }
 
     @Override

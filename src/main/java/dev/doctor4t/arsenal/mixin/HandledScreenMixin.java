@@ -1,11 +1,9 @@
 package dev.doctor4t.arsenal.mixin;
 
-import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.client.ArsenalClient;
+import dev.doctor4t.arsenal.network.SwapInventoryPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.Slot;
 import org.jetbrains.annotations.Nullable;
@@ -30,10 +28,7 @@ public class HandledScreenMixin<T extends ScreenHandler> {
     private void arsenal$onMouseClick(int button, CallbackInfo ci) {
         if (this.focusedSlot != null && this.handler.getCursorStack().isEmpty()) {
             if (ArsenalClient.swapKeybind.matchesMouse(button)) {
-                int slotId = this.focusedSlot.id;
-                PacketByteBuf buf = PacketByteBufs.create();
-                buf.writeInt(slotId);
-                ClientPlayNetworking.send(Arsenal.SERVERBOUND_SWAP_INVENTORY_PACKET, buf);
+                ClientPlayNetworking.send(new SwapInventoryPayload(this.focusedSlot.id));
                 ci.cancel();
             }
         }
@@ -43,10 +38,7 @@ public class HandledScreenMixin<T extends ScreenHandler> {
     private void arsenal$handleHotbarKeyPressed(int keyCode, int scanCode, CallbackInfoReturnable<Boolean> cir) {
         if (this.handler.getCursorStack().isEmpty() && this.focusedSlot != null) {
             if (ArsenalClient.swapKeybind.matchesKey(keyCode, scanCode)) {
-                int slotId = this.focusedSlot.id;
-                PacketByteBuf buf = PacketByteBufs.create();
-                buf.writeInt(slotId);
-                ClientPlayNetworking.send(Arsenal.SERVERBOUND_SWAP_INVENTORY_PACKET, buf);
+                ClientPlayNetworking.send(new SwapInventoryPayload(this.focusedSlot.id));
                 cir.setReturnValue(true);
             }
         }

@@ -2,7 +2,9 @@ package dev.doctor4t.arsenal;
 
 import dev.doctor4t.arsenal.cca.BackWeaponComponent;
 import dev.doctor4t.arsenal.index.*;
+import dev.doctor4t.arsenal.network.*;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.Slot;
@@ -12,57 +14,76 @@ import net.minecraft.util.Identifier;
 public class Arsenal implements ModInitializer {
     public static final String MOD_ID = "arsenal";
 
-    // Packet Identifiers
-    public static final Identifier SERVERBOUND_HOLD_WEAPON_PACKET = id("hold_weapon");
-    public static final Identifier SERVERBOUND_SWAP_WEAPON_PACKET = id("swap_weapon");
-    public static final Identifier SERVERBOUND_SWAP_INVENTORY_PACKET = id("swap_inventory");
-    public static final Identifier CLIENTBOUND_SWEEP_PACKET = id("sweep");
-
     public static Identifier id(String path) {
-        return new Identifier(MOD_ID, path);
+        return Identifier.of(MOD_ID, path);
     }
 
     @Override
     public void onInitialize() {
         ArsenalEntities.initialize();
         ArsenalItems.initialize();
-        ArsenalEnchantments.initialize();
         ArsenalSounds.initialize();
         ArsenalParticles.initialize();
         ArsenalStatusEffects.initialize();
 
-        ServerPlayNetworking.registerGlobalReceiver(SERVERBOUND_HOLD_WEAPON_PACKET, (server, player, handler, buf, responseSender) -> {
-            boolean hold = buf.readBoolean();
-            BackWeaponComponent.setHoldingBackWeapon(player, hold);
-        });
+        // Register all payload types (must be done on both sides before any send/receive)
+        PayloadTypeRegistry.playC2S().register(HoldWeaponPayload.ID, HoldWeaponPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(SwapWeaponPayload.ID, SwapWeaponPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(SwapInventoryPayload.ID, SwapInventoryPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(SetBackWeaponPayload.ID, SetBackWeaponPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(SweepPayload.ID, SweepPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(ShockwavePayload.ID, ShockwavePayload.CODEC);
 
-        ServerPlayNetworking.registerGlobalReceiver(SERVERBOUND_SWAP_WEAPON_PACKET, (server, player, handler, buf, responseSender) -> {
-            if (!player.isSpectator()) {
-                boolean toggled = BackWeaponComponent.isHoldingBackWeapon(player);
-                BackWeaponComponent.setHoldingBackWeapon(player, false);
-                ItemStack itemStack = BackWeaponComponent.getBackWeapon(player);
-                boolean success = BackWeaponComponent.setBackWeapon(player, player.getStackInHand(Hand.MAIN_HAND));
-                if (success) {
-                    player.setStackInHand(Hand.MAIN_HAND, itemStack);
-                }
-                player.clearActiveItem();
-                BackWeaponComponent.setHoldingBackWeapon(player, toggled);
-            }
-        });
+        // Server-side receivers
+        ServerPlayNetworking.registerGlobalReceiver(HoldWeaponPayload.ID, (payload, context) ->
+                context.server().execute(() ->
+                        BackWeaponComponent.setHoldingBackWeapon(context.player(), payload.hold())
+                )
+        );
 
-        ServerPlayNetworking.registerGlobalReceiver(SERVERBOUND_SWAP_INVENTORY_PACKET, (server, player, handler, buf, responseSender) -> {
-            int slotId = buf.readInt();
-            if (!player.isSpectator()) {
-                if (!player.currentScreenHandler.isValid(slotId)) {
-                    return;
-                }
-                Slot slot = player.currentScreenHandler.getSlot(slotId);
-                ItemStack itemStack = BackWeaponComponent.getBackWeapon(player);
-                boolean success = BackWeaponComponent.setBackWeapon(player, slot.getStack());
-                if (success) {
-                    slot.setStack(itemStack);
-                }
-            }
-        });
+        ServerPlayNetworking.registerGlobalReceiver(SwapWeaponPayload.ID, (payload, context) ->
+                context.server().execute(() -> {
+                    var player = context.player();
+                    if (!player.isSpectator()) {
+                        boolean toggled = BackWeaponComponent.isHoldingBackWeapon(player);
+                        BackWeaponComponent.setHoldingBackWeapon(player, false);
+                        ItemStack itemStack = BackWeaponComponent.getBackWeapon(player);
+                        boolean success = BackWeaponComponent.setBackWeapon(player, player.getStackInHand(Hand.MAIN_HAND));
+                        if (success) {
+                            player.setStackInHand(Hand.MAIN_HAND, itemStack);
+                        }
+                        player.clearActiveItem();
+                        BackWeaponComponent.setHoldingBackWeapon(player, toggled);
+                    }
+                })
+        );
+
+        // Creative back-slot: client sends the desired ItemStack directly.
+        // Server applies it; BackWeaponComponent (CCA AutoSynced) handles the sync.
+        ServerPlayNetworking.registerGlobalReceiver(SetBackWeaponPayload.ID, (payload, context) ->
+                context.server().execute(() -> {
+                    var player = context.player();
+                    if (!player.isSpectator()) {
+                        BackWeaponComponent.setBackWeapon(player, payload.stack());
+                    }
+                })
+        );
+
+        ServerPlayNetworking.registerGlobalReceiver(SwapInventoryPayload.ID, (payload, context) ->
+                context.server().execute(() -> {
+                    var player = context.player();
+                    if (!player.isSpectator()) {
+                        if (!player.currentScreenHandler.isValid(payload.slotId())) {
+                            return;
+                        }
+                        Slot slot = player.currentScreenHandler.getSlot(payload.slotId());
+                        ItemStack itemStack = BackWeaponComponent.getBackWeapon(player);
+                        boolean success = BackWeaponComponent.setBackWeapon(player, slot.getStack());
+                        if (success) {
+                            slot.setStack(itemStack);
+                        }
+                    }
+                })
+        );
     }
 }

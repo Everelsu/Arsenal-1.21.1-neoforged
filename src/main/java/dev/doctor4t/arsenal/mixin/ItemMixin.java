@@ -1,6 +1,5 @@
 package dev.doctor4t.arsenal.mixin;
 
-import dev.doctor4t.arsenal.cca.ArsenalComponents;
 import dev.doctor4t.arsenal.cca.WeaponOwnerComponent;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -29,7 +28,7 @@ public class ItemMixin {
             if (!world.isClient()) {
                 world.syncWorldEvent(null, 1018, user.getBlockPos(), 0);
                 Vec3d vec3d = user.getRotationVec(1.0F).normalize().multiply(2);
-                SmallFireballEntity smallFireballEntity = new SmallFireballEntity(world, user, vec3d.getX(), vec3d.getY(), vec3d.getZ());
+                SmallFireballEntity smallFireballEntity = new SmallFireballEntity(world, user, vec3d);
                 smallFireballEntity.setPosition(smallFireballEntity.getX(), user.getEyeY(), smallFireballEntity.getZ());
                 world.spawnEntity(smallFireballEntity);
                 stack.decrement(1);
@@ -42,8 +41,7 @@ public class ItemMixin {
     @Inject(method = "inventoryTick", at = @At("HEAD"))
     private void arsenal$setTridentOwner(ItemStack stack, World world, Entity entity, int slot, boolean selected, CallbackInfo ci) {
         if (stack.isOf(Items.TRIDENT) && entity instanceof PlayerEntity player) {
-            WeaponOwnerComponent weaponOwnerComponent = ArsenalComponents.WEAPON_OWNER_COMPONENT.get(stack);
-            weaponOwnerComponent.setOwner(player.getUuid());
+            WeaponOwnerComponent.setOwner(stack, player.getUuid());
         }
     }
 }

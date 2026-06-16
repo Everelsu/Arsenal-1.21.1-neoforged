@@ -23,15 +23,14 @@ public class ArsenalTagGen {
         @Override
         protected void configure(RegistryWrapper.WrapperLookup arg) {
             this.getOrCreateTagBuilder(DamageTypeTags.IS_PROJECTILE)
-                    .addOptional(ArsenalDamageTypes.ANCHOR)
-                    .addOptional(ArsenalDamageTypes.BLOOD_SCYTHE);
+                    .addOptional(ArsenalDamageTypes.ANCHOR.getValue())
+                    .addOptional(ArsenalDamageTypes.BLOOD_SCYTHE.getValue());
 
             this.getOrCreateTagBuilder(DamageTypeTags.BYPASSES_ENCHANTMENTS)
-                    .addOptional(ArsenalDamageTypes.SPEWING);
+                    .addOptional(ArsenalDamageTypes.SPEWING.getValue());
 
             this.getOrCreateTagBuilder(DamageTypeTags.BYPASSES_ARMOR)
-                    .addOptional(ArsenalDamageTypes.SPEWING);
-
+                    .addOptional(ArsenalDamageTypes.SPEWING.getValue());
         }
     }
 
@@ -41,9 +40,14 @@ public class ArsenalTagGen {
         }
 
         @Override
-        protected void configure(RegistryWrapper.WrapperLookup arg) { // TODO: Replace some of these with conventional tags
+        protected void configure(RegistryWrapper.WrapperLookup arg) {
             this.getOrCreateTagBuilder(ArsenalTags.DISPLAYABLE)
-                    .addOptionalTag(ItemTags.TOOLS)
+                    // FIX: ItemTags.TOOLS was removed in 1.21.1 and WRONG_TIER_TOOL_TIPS doesn't exist.
+                    // Use individual tool-category tags instead. SWORDS covers the most relevant case;
+                    // the TODO comment in the original source notes this section needs proper conventional tags anyway.
+                    .addOptionalTag(ItemTags.SWORDS)
+                    .addOptionalTag(ItemTags.AXES)
+                    .addOptionalTag(ItemTags.PICKAXES)
                     .addTag(ArsenalTags.BIG_WEAPONS)
                     .addTag(ArsenalTags.SHIELDS)
                     .addTag(ArsenalTags.RANGED_WEAPONS)

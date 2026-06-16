@@ -59,6 +59,12 @@ public class WeaponRackEntity extends ItemFrameEntity {
 
     @Override
     public boolean isInvulnerableTo(DamageSource damageSource) {
-        return damageSource.getSource() instanceof PlayerEntity player && this.getHeldItemStack().isEmpty() && !player.isSneaking();
+        // Invulnerable when the rack IS holding an item AND the player is NOT sneaking.
+        // Punch to drop the item, then punch the empty rack to break it.
+        // The previous condition was inverted: it made the EMPTY rack invulnerable to normal punches.
+        if (!(damageSource.getSource() instanceof PlayerEntity player)) {
+            return super.isInvulnerableTo(damageSource);
+        }
+        return !this.getHeldItemStack().isEmpty() && !player.isSneaking();
     }
 }

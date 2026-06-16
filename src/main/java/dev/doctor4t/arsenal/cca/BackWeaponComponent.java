@@ -1,14 +1,13 @@
 package dev.doctor4t.arsenal.cca;
 
-import dev.doctor4t.arsenal.Arsenal;
-import dev.onyxstudios.cca.api.v3.component.sync.AutoSyncedComponent;
+import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
+import dev.doctor4t.arsenal.network.HoldWeaponPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.registry.RegistryWrapper;
 import org.jetbrains.annotations.NotNull;
 
 public class BackWeaponComponent implements AutoSyncedComponent {
@@ -21,14 +20,23 @@ public class BackWeaponComponent implements AutoSyncedComponent {
     }
 
     @Override
-    public void readFromNbt(@NotNull NbtCompound tag) {
-        this.backWeapon.setStack(0, ItemStack.fromNbt(tag.getCompound("backWeapon")));
+    public void readFromNbt(@NotNull NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
+        // Guard: only decode if the key exists and has an "id" field.
+        // In 1.21.1, ItemStack.fromNbt() throws on an empty compound (no "id" key).
+        NbtCompound backWeaponNbt = tag.getCompound("backWeapon");
+        if (backWeaponNbt.contains("id")) {
+            ItemStack.fromNbt(registryLookup, backWeaponNbt)
+                    .ifPresent(stack -> this.backWeapon.setStack(0, stack));
+        }
         this.holdingBackWeapon = tag.getBoolean("holdingBackWeapon");
     }
 
     @Override
-    public void writeToNbt(@NotNull NbtCompound tag) {
-        tag.put("backWeapon", this.backWeapon.getStack(0).writeNbt(new NbtCompound()));
+    public void writeToNbt(@NotNull NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
+        // FIX: In 1.21.1, ItemStack.encode() throws IllegalStateException on an empty stack.
+        // Use encodeAllowEmpty() instead, which writes {count:0} for an empty stack and is
+        // safely round-tripped by the guarded readFromNbt above.
+        tag.put("backWeapon", this.backWeapon.getStack(0).encodeAllowEmpty(registryLookup));
         tag.putBoolean("holdingBackWeapon", this.holdingBackWeapon);
     }
 
@@ -73,9 +81,7 @@ public class BackWeaponComponent implements AutoSyncedComponent {
 
     public static void setHoldingBackWeapon(PlayerEntity player, boolean holdingBackWeapon) {
         if (player.getWorld().isClient()) {
-            PacketByteBuf buf = PacketByteBufs.create();
-            buf.writeBoolean(holdingBackWeapon);
-            ClientPlayNetworking.send(Arsenal.SERVERBOUND_HOLD_WEAPON_PACKET, buf);
+            ClientPlayNetworking.send(new HoldWeaponPayload(holdingBackWeapon));
             return;
         }
         ArsenalComponents.BACK_WEAPON_COMPONENT.get(player).setHoldingBackWeapon(holdingBackWeapon);

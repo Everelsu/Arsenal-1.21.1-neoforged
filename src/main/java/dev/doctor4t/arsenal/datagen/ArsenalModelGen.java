@@ -96,7 +96,7 @@ public class ArsenalModelGen extends FabricModelProvider {
     }
 
     private void registerBuiltinModel(Item item, ItemModelGenerator generator) {
-        generator.writer.accept(ModelIds.getItemModelId(item), new SimpleModelSupplier(new Identifier("builtin/entity")));
+        generator.writer.accept(ModelIds.getItemModelId(item), new SimpleModelSupplier(Identifier.of("builtin/entity")));
     }
 
     protected BlockStateVariant variant() {

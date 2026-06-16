@@ -5,6 +5,7 @@ import dev.doctor4t.arsenal.index.ArsenalCosmetics;
 import dev.doctor4t.arsenal.index.ArsenalEnchantments;
 import dev.doctor4t.arsenal.item.AnchorbladeItem;
 import dev.doctor4t.arsenal.util.AnchorOwner;
+import net.fabricmc.fabric.api.client.model.loading.v1.FabricBakedModelManager;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
@@ -22,7 +23,6 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 public class AnchorbladeEntityRenderer extends EntityRenderer<AnchorbladeEntity> {
@@ -49,12 +49,12 @@ public class AnchorbladeEntityRenderer extends EntityRenderer<AnchorbladeEntity>
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(yawAngle + 90));
         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-pitchAngle + 45));
 
-        BakedModel model = this.bakedModelManager.getModel(AnchorbladeItem.Skin.DEFAULT.anchorbladeEntityModel);
+        BakedModel model = ((FabricBakedModelManager) this.bakedModelManager).getModel(AnchorbladeItem.Skin.DEFAULT.anchorbladeEntityModel);
         RenderLayer chainLayer = RenderLayer.getEntitySmoothCutout(AnchorbladeItem.Skin.DEFAULT.chainTexture);
         ItemStack stack = anchorbladeEntity.getStack();
         AnchorbladeItem.Skin skin = AnchorbladeItem.Skin.fromString(ArsenalCosmetics.getSkin(stack));
         if (skin != null) {
-            model = this.bakedModelManager.getModel(skin.anchorbladeEntityModel);
+            model = ((FabricBakedModelManager) this.bakedModelManager).getModel(skin.anchorbladeEntityModel);
             chainLayer = RenderLayer.getEntitySmoothCutout(skin.chainTexture);
         }
         this.itemRenderer.renderItem(stack, ModelTransformationMode.FIXED, false, matrices, vertexConsumers, light, OverlayTexture.DEFAULT_UV, model);
@@ -67,21 +67,12 @@ public class AnchorbladeEntityRenderer extends EntityRenderer<AnchorbladeEntity>
             Vec3d ringPos = new Vec3d((skin == AnchorbladeItem.Skin.AMBESSA ? 0f : 1f), 0, 0).rotateZ(pitchAngle * MathHelper.RADIANS_PER_DEGREE).rotateY((yawAngle + 90) * MathHelper.RADIANS_PER_DEGREE).add(0, anchorbladeEntity.getHeight() / 2f, 0);
             Vec3d leashPos = livingOwner.getLeashPos(tickDelta);
 
-            // TODO: Offset off hand chain but I can't figure it out rn
-//            if (livingOwner instanceof AnchorOwner anchorOwner) {
-//                boolean reeling = EnchantmentHelper.getLevel(ArsenalEnchantments.REELING, stack) > 0;
-//                Hand hand = Hand.OFF_HAND;
-//                if (anchorOwner.arsenal$isAnchorActive(hand, reeling) && anchorOwner.arsenal$getAnchor(hand, reeling).equals(anchorbladeEntity)) {
-//                    leashPos = leashPos.offset(Direction.EAST, 1f);
-//                }
-//            }
-
             Vec3d ownerPos = leashPos.subtract(pos);
 
             float length = (float) ringPos.distanceTo(ownerPos);
+            // FIX: use MatrixStack.Entry directly instead of extracting Matrix3f
             MatrixStack.Entry matrixEntry = matrices.peek();
             Matrix4f modelMatrix = matrixEntry.getPositionMatrix();
-            Matrix3f normal = matrixEntry.getNormalMatrix();
             float minU = 0;
             float maxU = 1;
             float minV = 0;
@@ -94,16 +85,22 @@ public class AnchorbladeEntityRenderer extends EntityRenderer<AnchorbladeEntity>
             Vec3d vert3 = ownerPos.subtract(offset);
             Vec3d vert4 = ringPos.subtract(offset);
             int chainLight = LightmapTextureManager.pack(this.getBlockLight(anchorbladeEntity, livingOwner.getBlockPos()), this.getSkyLight(anchorbladeEntity, livingOwner.getBlockPos()));
-            this.vertex(vert1, vertexConsumer, minU, minV, modelMatrix, normal, light);
-            this.vertex(vert2, vertexConsumer, minU, maxV, modelMatrix, normal, chainLight);
-            this.vertex(vert3, vertexConsumer, maxU, maxV, modelMatrix, normal, chainLight);
-            this.vertex(vert4, vertexConsumer, maxU, minV, modelMatrix, normal, light);
+            this.vertex(vert1, vertexConsumer, minU, minV, matrixEntry, light);
+            this.vertex(vert2, vertexConsumer, minU, maxV, matrixEntry, chainLight);
+            this.vertex(vert3, vertexConsumer, maxU, maxV, matrixEntry, chainLight);
+            this.vertex(vert4, vertexConsumer, maxU, minV, matrixEntry, light);
             matrices.pop();
         }
     }
 
-    private void vertex(Vec3d vec, VertexConsumer vertexConsumer, float u, float v, Matrix4f modelMatrix, Matrix3f normal, int light) {
-        vertexConsumer.vertex(modelMatrix, (float) vec.x, (float) vec.y, (float) vec.z).color(255, 255, 255, 255).texture(u, v).overlay(OverlayTexture.DEFAULT_UV).light(light).normal(normal, 0, 1, 0).next();
+    // FIX: normal() now takes MatrixStack.Entry, not Matrix3f; also removed .next()
+    private void vertex(Vec3d vec, VertexConsumer vertexConsumer, float u, float v, MatrixStack.Entry entry, int light) {
+        vertexConsumer.vertex(entry.getPositionMatrix(), (float) vec.x, (float) vec.y, (float) vec.z)
+                .color(255, 255, 255, 255)
+                .texture(u, v)
+                .overlay(OverlayTexture.DEFAULT_UV)
+                .light(light)
+                .normal(entry, 0, 1, 0);
     }
 
     @Override
