@@ -1,7 +1,5 @@
 package dev.doctor4t.arsenal.mixin.client;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import dev.doctor4t.arsenal.cca.BackWeaponComponent;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.Gui;
@@ -59,11 +57,4 @@ public abstract class InGameHudMixin {
         }
     }
 
-    @WrapOperation(method = "renderHotbar", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphics;blitSprite(Lnet/minecraft/resources/ResourceLocation;IIII)V", ordinal = 1))
-    private void arsenal$selection(GuiGraphics instance, ResourceLocation texture, int x, int y, int width, int height, Operation<Void> original) {
-        if (this.getCameraPlayer() != null && BackWeaponComponent.isHoldingBackWeapon(this.getCameraPlayer())) {
-            return;
-        }
-        original.call(instance, texture, x, y, width, height);
-    }
 }
