@@ -6,6 +6,7 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.TextureSheetParticle;
+import net.minecraft.core.particles.SimpleParticleType;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.Color;
@@ -38,7 +39,7 @@ public class SweepAttackParticle extends TextureSheetParticle {
         return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
     }
 
-    public static class Factory implements ParticleProvider<SweepParticleType> {
+    public static class Factory implements ParticleProvider<SimpleParticleType> {
         private final SpriteSet spriteProvider;
 
         public Factory(SpriteSet spriteProvider) {
@@ -46,10 +47,10 @@ public class SweepAttackParticle extends TextureSheetParticle {
         }
 
         @Override
-        public @Nullable SweepAttackParticle createParticle(SweepParticleType parameters, ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
+        public @Nullable SweepAttackParticle createParticle(SimpleParticleType parameters, ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
             SweepAttackParticle instance = new SweepAttackParticle(world, x, y, z, this.spriteProvider);
-            if (parameters.initialData != null) {
-                Color color = new Color(parameters.initialData.color, true);
+            if (parameters instanceof SweepParticleType sweep && sweep.initialData != null) {
+                Color color = new Color(sweep.initialData.color, true);
                 instance.setColor(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
                 instance.setAlpha(color.getAlpha() / 255f);
             }

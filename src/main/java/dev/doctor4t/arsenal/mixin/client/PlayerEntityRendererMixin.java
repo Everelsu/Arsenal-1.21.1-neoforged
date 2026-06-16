@@ -4,39 +4,39 @@ import dev.doctor4t.arsenal.client.render.feature.BackWeaponFeatureRenderer;
 import dev.doctor4t.arsenal.index.ArsenalEnchantments;
 import dev.doctor4t.arsenal.index.ArsenalItems;
 import dev.doctor4t.arsenal.util.AnchorOwner;
-import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.render.entity.LivingEntityRenderer;
-import net.minecraft.client.render.entity.PlayerEntityRenderer;
-import net.minecraft.client.render.entity.model.BipedEntityModel;
-import net.minecraft.client.render.entity.model.PlayerEntityModel;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(PlayerEntityRenderer.class)
-public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<AbstractClientPlayerEntity, PlayerEntityModel<AbstractClientPlayerEntity>> {
-    public PlayerEntityRendererMixin(EntityRendererFactory.Context ctx, PlayerEntityModel<AbstractClientPlayerEntity> model, float shadowRadius) {
+@Mixin(PlayerRenderer.class)
+public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
+    public PlayerEntityRendererMixin(EntityRendererProvider.Context ctx, PlayerModel<AbstractClientPlayer> model, float shadowRadius) {
         super(ctx, model, shadowRadius);
     }
 
     @Inject(method = "getArmPose", at = @At("HEAD"), cancellable = true)
-    private static void arsenal$swordPoses(AbstractClientPlayerEntity player, Hand hand, CallbackInfoReturnable<BipedEntityModel.ArmPose> cir) {
-        ItemStack stack = player.getStackInHand(hand);
-        if (stack.isOf(ArsenalItems.ANCHORBLADE)) {
-            boolean reeling = ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, player.getWorld()) > 0;
+    private static void arsenal$swordPoses(AbstractClientPlayer player, InteractionHand hand, CallbackInfoReturnable<HumanoidModel.ArmPose> cir) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (stack.is(ArsenalItems.ANCHORBLADE)) {
+            boolean reeling = ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, player.level()) > 0;
             if (player instanceof AnchorOwner owner && owner.arsenal$isAnchorActive(hand, reeling)) {
-                cir.setReturnValue(BipedEntityModel.ArmPose.EMPTY);
+                cir.setReturnValue(HumanoidModel.ArmPose.EMPTY);
             }
         }
     }
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    public void arsenal$backBlade(EntityRendererFactory.Context ctx, boolean slim, CallbackInfo ci) {
-        this.addFeature(new BackWeaponFeatureRenderer(this));
+    public void arsenal$backBlade(EntityRendererProvider.Context ctx, boolean slim, CallbackInfo ci) {
+        this.addLayer(new BackWeaponFeatureRenderer(this));
     }
 }

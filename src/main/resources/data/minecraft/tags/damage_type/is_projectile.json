@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "arsenal:anchor",
+      "required": false
+    },
+    {
+      "id": "arsenal:blood_scythe",
+      "required": false
+    }
+  ]
+}

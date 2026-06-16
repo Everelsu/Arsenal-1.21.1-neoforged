@@ -1,12 +1,12 @@
 package dev.doctor4t.arsenal.mixin.accessors;
 
-import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.world.inventory.Slot;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(CreativeInventoryScreen.CreativeSlot.class)
+@Mixin(CreativeModeInventoryScreen.SlotWrapper.class)
 public interface CreativeSlotAccessor {
-    @Accessor("slot")
+    @Accessor("target")
     Slot getSlot();
 }
