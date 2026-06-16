@@ -97,15 +97,9 @@ public class AnchorbladeEntity extends AbstractArrow {
                     return;
                 }
                 float e = (float) (d / 5f);
-                Vec3 pull = this.position().subtract(owner.getEyePosition()).normalize();
-                if (owner instanceof LivingEntity living && living.isFallFlying()) {
-                    // Don't disrupt an active elytra glide: add a soft impulse toward the hook
-                    // instead of overwriting velocity, and keep fallDistance intact.
-                    owner.setDeltaMovement(owner.getDeltaMovement().add(pull.scale(e * 0.5)));
-                } else {
-                    owner.setDeltaMovement(owner.getDeltaMovement().scale(0.95).add(pull.scale(e)));
-                    owner.fallDistance = 0;
-                }
+                Vec3 vec3d = this.position().subtract(owner.getEyePosition());
+                owner.setDeltaMovement(owner.getDeltaMovement().scale(0.95).add(vec3d.normalize().scale(e)));
+                owner.fallDistance = 0;
             } else {
                 float radius = 5f;
                 if (this.level().isClientSide) {
@@ -267,12 +261,4 @@ public class AnchorbladeEntity extends AbstractArrow {
         }
     }
 
-    /**
-     * Instantly detaches the hook: stops the reeling pull and removes the blade,
-     * leaving the owner's current momentum untouched. Triggered by right-click.
-     */
-    public void detach() {
-        this.setDealtDamage(true);
-        this.discard();
-    }
 }

@@ -8,6 +8,7 @@ import dev.doctor4t.arsenal.compat.CustomHitSoundItem;
 import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
 import dev.doctor4t.arsenal.index.ArsenalCosmetics;
 import dev.doctor4t.arsenal.index.ArsenalEnchantments;
+import dev.doctor4t.arsenal.index.ArsenalItems;
 import dev.doctor4t.arsenal.index.ArsenalSounds;
 import dev.doctor4t.arsenal.util.AnchorOwner;
 import dev.doctor4t.arsenal.util.SweepParticleUtil;
@@ -84,12 +85,11 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
                 activeAnchor = owner.arsenal$getAnchor(hand, !reeling);
             }
             if (activeAnchor != null && activeAnchor.isAlive()) {
-                // Right-click while a hook is out instantly detaches it: pulling stops and the
-                // blade is removed, leaving the player's current momentum untouched.
-                if (!world.isClientSide) {
-                    activeAnchor.detach();
-                }
-                return InteractionResultHolder.sidedSuccess(stack, world.isClientSide());
+                // Right-click recall, exactly as in Arsenal: the blade flies back to the player
+                // (reeling them along) only if they hold an anchorblade in the other hand.
+                boolean otherHandAnchor = user.getItemInHand(hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND).is(ArsenalItems.ANCHORBLADE.get());
+                activeAnchor.setRecalled(otherHandAnchor);
+                return InteractionResultHolder.fail(stack);
             }
             int riptide = world.registryAccess()
                     .registryOrThrow(Registries.ENCHANTMENT)
