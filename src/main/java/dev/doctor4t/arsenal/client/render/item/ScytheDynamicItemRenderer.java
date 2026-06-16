@@ -1,5 +1,6 @@
 package dev.doctor4t.arsenal.client.render.item;
 
+import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.datafixers.util.Pair;
 import dev.doctor4t.arsenal.Arsenal;
@@ -72,8 +73,13 @@ public class ScytheDynamicItemRenderer extends BlockEntityWithoutLevelRenderer {
         ResourceLocation chosen = inHand ? pair.getSecond() : pair.getFirst();
         BakedModel model = Minecraft.getInstance().getModelManager().getModel(ModelResourceLocation.standalone(chosen));
 
+        boolean inInventory = mode == ItemDisplayContext.GUI;
+        // Use flat (GUI) lighting for inventory rendering so the model isn't 3D-shaded dark.
+        if (inInventory) Lighting.setupForFlatItems();
         Minecraft.getInstance().getItemRenderer()
                 .render(stack, mode, leftHanded, matrices, vertexConsumers, light, overlay, model);
+        if (vertexConsumers instanceof MultiBufferSource.BufferSource bufferSource) bufferSource.endBatch();
+        if (inInventory) Lighting.setupFor3DItems();
 
         matrices.popPose();
     }
