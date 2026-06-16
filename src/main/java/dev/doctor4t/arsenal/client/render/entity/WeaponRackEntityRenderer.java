@@ -1,148 +1,151 @@
 package dev.doctor4t.arsenal.client.render.entity;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.entity.WeaponRackEntity;
 import dev.doctor4t.arsenal.index.ArsenalTags;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.model.loading.v1.FabricBakedModelManager;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.TexturedRenderLayers;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.render.item.ItemRenderer;
-import net.minecraft.client.render.model.BakedModelManager;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
-import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.EntityType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.*;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.resources.model.ModelManager;
+import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 
-@Environment(EnvType.CLIENT)
 public class WeaponRackEntityRenderer<T extends WeaponRackEntity> extends EntityRenderer<T> {
-    // "block/" prefix so addModels() resolves to assets/arsenal/models/block/weapon_rack.json.
-    // Without the prefix, the lookup path is assets/arsenal/models/weapon_rack.json which doesn't exist,
-    // causing the model to fall back to the missing-texture checkerboard.
-    public static final Identifier MODEL = Arsenal.id("block/weapon_rack");
+    public static final ResourceLocation MODEL = Arsenal.id("block/weapon_rack");
     private final ItemRenderer itemRenderer;
-    private final BlockRenderManager blockRenderManager;
+    private final BlockRenderDispatcher blockRenderManager;
 
-    public WeaponRackEntityRenderer(EntityRendererFactory.Context context) {
+    public WeaponRackEntityRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.itemRenderer = context.getItemRenderer();
-        this.blockRenderManager = context.getBlockRenderManager();
+        this.blockRenderManager = context.getBlockRenderDispatcher();
     }
 
-    protected int getBlockLight(T itemFrameEntity, BlockPos blockPos) {
+    @Override
+    protected int getBlockLightLevel(T itemFrameEntity, BlockPos blockPos) {
         return itemFrameEntity.getType() == EntityType.GLOW_ITEM_FRAME
-                ? Math.max(5, super.getBlockLight(itemFrameEntity, blockPos))
-                : super.getBlockLight(itemFrameEntity, blockPos);
+                ? Math.max(5, super.getBlockLightLevel(itemFrameEntity, blockPos))
+                : super.getBlockLightLevel(itemFrameEntity, blockPos);
     }
 
-    public void render(T itemFrameEntity, float f, float g, MatrixStack matrices, VertexConsumerProvider vertexConsumerProvider, int i) {
+    @Override
+    public void render(T itemFrameEntity, float f, float g, PoseStack matrices, MultiBufferSource vertexConsumerProvider, int i) {
         super.render(itemFrameEntity, f, g, matrices, vertexConsumerProvider, i);
-        matrices.push();
-        Direction direction = itemFrameEntity.getHorizontalFacing();
-        Vec3d vec3d = this.getPositionOffset(itemFrameEntity, g);
-        matrices.translate(-vec3d.getX(), -vec3d.getY(), -vec3d.getZ());
+        matrices.pushPose();
+        Direction direction = itemFrameEntity.getDirection();
+        Vec3 vec3d = this.getRenderOffset(itemFrameEntity, g);
+        matrices.translate(-vec3d.x(), -vec3d.y(), -vec3d.z());
         double d = 0.46875;
-        matrices.translate((double) direction.getOffsetX() * d, (double) direction.getOffsetY() * d, (double) direction.getOffsetZ() * d);
-        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(itemFrameEntity.getPitch()));
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F - itemFrameEntity.getYaw()));
+        matrices.translate((double) direction.getStepX() * d, (double) direction.getStepY() * d, (double) direction.getStepZ() * d);
+        matrices.mulPose(Axis.XP.rotationDegrees(itemFrameEntity.getXRot()));
+        matrices.mulPose(Axis.YP.rotationDegrees(180.0F - itemFrameEntity.getYRot()));
         boolean bl = itemFrameEntity.isInvisible();
-        ItemStack itemStack = itemFrameEntity.getHeldItemStack();
+        ItemStack itemStack = itemFrameEntity.getItem();
 
         int rotation = itemFrameEntity.getRotation();
-        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((float) rotation * 360.0F / 8.0F));
+        matrices.mulPose(Axis.ZP.rotationDegrees((float) rotation * 360.0F / 8.0F));
 
         if (!bl) {
-            BakedModelManager bakedModelManager = this.blockRenderManager.getModels().getModelManager();
-            matrices.push();
+            ModelManager bakedModelManager = this.blockRenderManager.getBlockModelShaper().getModelManager();
+            matrices.pushPose();
             matrices.translate(-0.5F, -0.5F, -0.5F);
             this.blockRenderManager
                     .getModelRenderer()
-                    .render(
-                            matrices.peek(),
-                            vertexConsumerProvider.getBuffer(TexturedRenderLayers.getEntityCutout()),
+                    .renderModel(
+                            matrices.last(),
+                            vertexConsumerProvider.getBuffer(Sheets.cutoutBlockSheet()),
                             null,
-                            ((FabricBakedModelManager) bakedModelManager).getModel(MODEL),
+                            bakedModelManager.getModel(ModelResourceLocation.standalone(MODEL)),
                             1.0F,
                             1.0F,
                             1.0F,
                             i,
-                            OverlayTexture.DEFAULT_UV
+                            OverlayTexture.NO_OVERLAY
                     );
-            matrices.pop();
+            matrices.popPose();
         }
 
         if (!itemStack.isEmpty()) {
             float zRot = 135f;
             float scale = .85f;
-            if (itemStack.isIn(ArsenalTags.BIG_WEAPONS)) {
+            if (itemStack.is(ArsenalTags.BIG_WEAPONS)) {
                 scale = 1.6f;
             }
-            if (itemStack.isIn(ArsenalTags.RANGED_WEAPONS)) {
+            if (itemStack.is(ArsenalTags.RANGED_WEAPONS)) {
                 zRot = 45f;
             }
-            if (itemStack.isIn(ArsenalTags.SHIELDS)) {
+            if (itemStack.is(ArsenalTags.SHIELDS)) {
                 scale = 1.8f;
                 zRot = 0f;
             }
-            if (itemStack.isIn(ArsenalTags.TRIDENTS)) {
+            if (itemStack.is(ArsenalTags.TRIDENTS)) {
                 zRot = -45f;
             }
 
-            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(zRot));
+            matrices.mulPose(Axis.ZP.rotationDegrees(zRot));
 
-            float offset = MathHelper.hashCode(itemFrameEntity.getBlockX(), itemFrameEntity.getBlockY(), itemFrameEntity.getBlockZ()) * 0.00000000000000001f;
+            float offset = (float) Mth.getSeed(itemFrameEntity.getBlockX(), itemFrameEntity.getBlockY(), itemFrameEntity.getBlockZ()) * 0.00000000000000001f;
             if (bl) {
                 matrices.translate(0.0F + offset, 0.0F + offset, 0.4375F + offset);
             } else {
                 matrices.translate(0.0F + offset, 0.0F + offset, 0.3f + offset);
             }
 
-            int light = this.getLight(itemFrameEntity, LightmapTextureManager.MAX_LIGHT_COORDINATE, i);
+            int light = this.getLight(itemFrameEntity, LightTexture.FULL_BRIGHT, i);
 
             matrices.scale(scale, scale, scale);
 
             this.itemRenderer
-                    .renderItem(
+                    .renderStatic(
                             itemStack,
-                            ModelTransformationMode.FIXED,
+                            ItemDisplayContext.FIXED,
                             light,
-                            OverlayTexture.DEFAULT_UV,
+                            OverlayTexture.NO_OVERLAY,
                             matrices,
                             vertexConsumerProvider,
-                            itemFrameEntity.getWorld(),
+                            itemFrameEntity.level(),
                             itemFrameEntity.getId()
                     );
         }
 
-        matrices.pop();
+        matrices.popPose();
     }
 
     private int getLight(T itemFrame, int glowLight, int regularLight) {
         return itemFrame.getType() == EntityType.GLOW_ITEM_FRAME ? glowLight : regularLight;
     }
 
-    public Vec3d getPositionOffset(T itemFrameEntity, float f) {
-        return new Vec3d(
-                (float) itemFrameEntity.getHorizontalFacing().getOffsetX() * 0.3F,
+    @Override
+    public Vec3 getRenderOffset(T itemFrameEntity, float f) {
+        return new Vec3(
+                (float) itemFrameEntity.getDirection().getStepX() * 0.3F,
                 -0.25,
-                (float) itemFrameEntity.getHorizontalFacing().getOffsetZ() * 0.3F
+                (float) itemFrameEntity.getDirection().getStepZ() * 0.3F
         );
     }
 
-    public Identifier getTexture(T itemFrameEntity) {
-        return SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE;
+    @Override
+    public ResourceLocation getTextureLocation(T itemFrameEntity) {
+        return TextureAtlas.LOCATION_BLOCKS;
     }
 
-    protected boolean hasLabel(T itemFrameEntity) {
+    @Override
+    protected boolean shouldShowName(T itemFrameEntity) {
         return false;
     }
 }
