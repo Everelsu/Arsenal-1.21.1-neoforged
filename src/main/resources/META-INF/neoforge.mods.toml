@@ -1,0 +1,32 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "ARR"
+issueTrackerURL = "https://github.com/doctor4t/Arsenal/issues"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "Arsenal"
+authors = "doctor4t, AmyMialee, Azverial"
+description = '''
+A weapons mod focused on adding few but qualitative weapons
+'''
+logoFile = "assets/arsenal/icon.png"
+displayURL = "https://modrinth.com/mod/arsenal"
+
+[[mixins]]
+config = "arsenal.mixins.json"
+
+[[dependencies."${mod_id}"]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
