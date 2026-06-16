@@ -1,60 +1,52 @@
 package dev.doctor4t.arsenal.client.particle;
 
 import dev.doctor4t.arsenal.client.particle.type.SweepParticleType;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider;
-import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.client.particle.ParticleTextureSheet;
-import net.minecraft.client.particle.SpriteBillboardParticle;
-import net.minecraft.client.particle.SpriteProvider;
-import net.minecraft.client.world.ClientWorld;
-
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.particle.ParticleProvider;
+import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.particle.TextureSheetParticle;
 import org.jetbrains.annotations.Nullable;
 
-import java.awt.*;
+import java.awt.Color;
 
-public class SweepAttackParticle extends SpriteBillboardParticle {
-    private final SpriteProvider spriteWithAge;
+public class SweepAttackParticle extends TextureSheetParticle {
+    private final SpriteSet spriteWithAge;
 
-    private SweepAttackParticle(ClientWorld world, double x, double y, double z, SpriteProvider spriteWithAge) {
+    private SweepAttackParticle(ClientLevel world, double x, double y, double z, SpriteSet spriteWithAge) {
         super(world, x, y, z, 0.0D, 0.0D, 0.0D);
         this.spriteWithAge = spriteWithAge;
-        this.maxAge = 4;
-        this.scale = 1.0F;
-        this.setSpriteForAge(spriteWithAge);
+        this.lifetime = 4;
+        this.quadSize = 1.0F;
+        this.setSpriteFromAge(spriteWithAge);
     }
 
     @Override
     public void tick() {
-        this.prevPosX = this.x;
-        this.prevPosY = this.y;
-        this.prevPosZ = this.z;
-        if (this.age++ >= this.maxAge) {
-            this.markDead();
+        this.xo = this.x;
+        this.yo = this.y;
+        this.zo = this.z;
+        if (this.age++ >= this.lifetime) {
+            this.remove();
         } else {
-            this.setSpriteForAge(this.spriteWithAge);
+            this.setSpriteFromAge(this.spriteWithAge);
         }
     }
 
     @Override
-    public ParticleTextureSheet getType() {
-        return ParticleTextureSheet.PARTICLE_SHEET_TRANSLUCENT;
+    public ParticleRenderType getRenderType() {
+        return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
     }
 
-    @Environment(EnvType.CLIENT)
-    public static class Factory implements ParticleFactory<SweepParticleType> {
-        private final SpriteProvider spriteProvider;
+    public static class Factory implements ParticleProvider<SweepParticleType> {
+        private final SpriteSet spriteProvider;
 
-        // FabricSpriteProvider extends SpriteProvider, so this accepts what the
-        // PendingParticleFactory registry injects while remaining compatible with
-        // the rest of the particle internals that use SpriteProvider.
-        public Factory(FabricSpriteProvider spriteProvider) {
+        public Factory(SpriteSet spriteProvider) {
             this.spriteProvider = spriteProvider;
         }
 
         @Override
-        public @Nullable SweepAttackParticle createParticle(SweepParticleType parameters, ClientWorld world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
+        public @Nullable SweepAttackParticle createParticle(SweepParticleType parameters, ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
             SweepAttackParticle instance = new SweepAttackParticle(world, x, y, z, this.spriteProvider);
             if (parameters.initialData != null) {
                 Color color = new Color(parameters.initialData.color, true);

@@ -1,53 +1,53 @@
 package dev.doctor4t.arsenal.client.particle;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.client.particle.*;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.particle.Particle;
+import net.minecraft.client.particle.ParticleProvider;
+import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.particle.TextureSheetParticle;
+import net.minecraft.core.particles.SimpleParticleType;
 
-@Environment(EnvType.CLIENT)
-public class ScytheAttackParticle extends SpriteBillboardParticle {
-    private final SpriteProvider spriteWithAge;
+public class ScytheAttackParticle extends TextureSheetParticle {
+    private final SpriteSet spriteWithAge;
 
-    private ScytheAttackParticle(ClientWorld world, double x, double y, double z, double scale, SpriteProvider spriteWithAge) {
+    private ScytheAttackParticle(ClientLevel world, double x, double y, double z, double scale, SpriteSet spriteWithAge) {
         super(world, x, y, z, 0.0D, 0.0D, 0.0D);
         this.spriteWithAge = spriteWithAge;
-        this.maxAge = 4;
+        this.lifetime = 4;
         float f = this.random.nextFloat() * 0.6F + 0.4F;
-        this.red = f;
-        this.green = f;
-        this.blue = f;
-        this.scale = 1.0F - (float) scale * 0.5F;
-        this.setSpriteForAge(spriteWithAge);
+        this.rCol = f;
+        this.gCol = f;
+        this.bCol = f;
+        this.quadSize = 1.0F - (float) scale * 0.5F;
+        this.setSpriteFromAge(spriteWithAge);
     }
 
     @Override
-    protected int getBrightness(float tint) {
+    protected int getLightColor(float tint) {
         return 15728880;
     }
 
     @Override
     public void tick() {
-        this.prevPosX = this.x;
-        this.prevPosY = this.y;
-        this.prevPosZ = this.z;
-        if (this.age++ >= this.maxAge) {
-            this.markDead();
+        this.xo = this.x;
+        this.yo = this.y;
+        this.zo = this.z;
+        if (this.age++ >= this.lifetime) {
+            this.remove();
         } else {
-            this.setSpriteForAge(this.spriteWithAge);
+            this.setSpriteFromAge(this.spriteWithAge);
         }
     }
 
     @Override
-    public ParticleTextureSheet getType() {
-        return ParticleTextureSheet.PARTICLE_SHEET_LIT;
+    public ParticleRenderType getRenderType() {
+        return ParticleRenderType.PARTICLE_SHEET_LIT;
     }
 
-    @Environment(EnvType.CLIENT)
-    public record Factory(SpriteProvider spriteSet) implements ParticleFactory<SimpleParticleType> {
+    public record Factory(SpriteSet spriteSet) implements ParticleProvider<SimpleParticleType> {
         @Override
-        public Particle createParticle(SimpleParticleType parameters, ClientWorld world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
+        public Particle createParticle(SimpleParticleType parameters, ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ) {
             return new ScytheAttackParticle(world, x, y, z, velocityX, this.spriteSet);
         }
     }

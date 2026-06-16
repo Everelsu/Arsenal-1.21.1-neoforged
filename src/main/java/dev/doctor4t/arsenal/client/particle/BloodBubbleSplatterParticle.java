@@ -1,54 +1,55 @@
 package dev.doctor4t.arsenal.client.particle;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.client.particle.*;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.particle.Particle;
+import net.minecraft.client.particle.ParticleProvider;
+import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.particle.TextureSheetParticle;
+import net.minecraft.core.particles.SimpleParticleType;
 
-public class BloodBubbleSplatterParticle extends SpriteBillboardParticle {
-    private final SpriteProvider spriteProvider;
+public class BloodBubbleSplatterParticle extends TextureSheetParticle {
+    private final SpriteSet spriteProvider;
 
-    public BloodBubbleSplatterParticle(ClientWorld world, double x, double y, double z, double velocityX, double velocityY, double velocityZ, SpriteProvider spriteProvider) {
+    public BloodBubbleSplatterParticle(ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ, SpriteSet spriteProvider) {
         super(world, x, y, z, velocityX, velocityY, velocityZ);
         this.spriteProvider = spriteProvider;
-        this.setSpriteForAge(spriteProvider);
-        this.scale *= 0.5f + this.random.nextFloat() * 0.50f;
+        this.setSpriteFromAge(spriteProvider);
+        this.quadSize *= 0.5f + this.random.nextFloat() * 0.50f;
 
-        this.velocityX = velocityX;
-        this.velocityY = velocityY;
-        this.velocityZ = velocityZ;
+        this.xd = velocityX;
+        this.yd = velocityY;
+        this.zd = velocityZ;
     }
 
     @Override
-    public ParticleTextureSheet getType() {
-        return ParticleTextureSheet.PARTICLE_SHEET_LIT;
+    public ParticleRenderType getRenderType() {
+        return ParticleRenderType.PARTICLE_SHEET_LIT;
     }
 
     @Override
     public void tick() {
-        this.setSpriteForAge(this.spriteProvider);
-        this.prevPosX = this.x;
-        this.prevPosY = this.y;
-        this.prevPosZ = this.z;
-        if (this.age++ >= this.maxAge) {
-            this.markDead();
+        this.setSpriteFromAge(this.spriteProvider);
+        this.xo = this.x;
+        this.yo = this.y;
+        this.zo = this.z;
+        if (this.age++ >= this.lifetime) {
+            this.remove();
             return;
         }
-        this.velocityY -= 0.05;
-        this.move(this.velocityX, this.velocityY, this.velocityZ);
+        this.yd -= 0.05;
+        this.move(this.xd, this.yd, this.zd);
     }
 
-    @Environment(EnvType.CLIENT)
-    public static class Factory implements ParticleFactory<SimpleParticleType> {
-        private final SpriteProvider spriteProvider;
+    public static class Factory implements ParticleProvider<SimpleParticleType> {
+        private final SpriteSet spriteProvider;
 
-        public Factory(SpriteProvider spriteProvider) {
+        public Factory(SpriteSet spriteProvider) {
             this.spriteProvider = spriteProvider;
         }
 
         @Override
-        public Particle createParticle(SimpleParticleType defaultParticleType, ClientWorld clientWorld, double d, double e, double f, double g, double h, double i) {
+        public Particle createParticle(SimpleParticleType defaultParticleType, ClientLevel clientWorld, double d, double e, double f, double g, double h, double i) {
             return new BloodBubbleSplatterParticle(clientWorld, d, e, f, g, h, i, this.spriteProvider);
         }
     }
