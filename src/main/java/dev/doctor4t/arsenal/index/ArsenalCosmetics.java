@@ -1,30 +1,32 @@
 package dev.doctor4t.arsenal.index;
 
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
-
-import java.util.UUID;
+import net.minecraft.world.item.component.CustomData;
 
 /**
- * Supporter weapon-skin cosmetics.
+ * Weapon-skin cosmetics.
  *
- * <p>The original Fabric mod backed this with the "datasync" supporter-entitlement
- * web service, which has no NeoForge port. The skin system is therefore stubbed:
- * every weapon resolves to the "default" skin and skin changes are no-ops. The
- * public API is kept so renderers and items compile unchanged; reinstating real
- * skins would require a NeoForge-compatible entitlement backend.
+ * <p>Skins are stored per-ItemStack in vanilla {@code CUSTOM_DATA} and may be changed
+ * by anyone (no supporter/subscription gate). The original Fabric mod backed skins with
+ * the "datasync" supporter service, which has no NeoForge port; this local per-stack
+ * storage replaces it.
  */
 public interface ArsenalCosmetics {
     String DEFAULT_SKIN = "default";
+    String SKIN_KEY = "arsenal_skin";
 
-    static String getSkin(ItemStack itemStack) {
-        return DEFAULT_SKIN;
+    static String getSkin(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return DEFAULT_SKIN;
+        CompoundTag tag = data.copyTag();
+        return tag.contains(SKIN_KEY) ? tag.getString(SKIN_KEY) : DEFAULT_SKIN;
     }
 
-    static void setSkin(UUID playerUuid, ItemStack itemStack, String skinName) {
-        // no-op: supporter skin backend (datasync) is unavailable on NeoForge
-    }
-
-    static boolean isSupporter(UUID uuid) {
-        return false;
+    static void setSkin(ItemStack stack, String skinName) {
+        CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        tag.putString(SKIN_KEY, skinName);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
     }
 }

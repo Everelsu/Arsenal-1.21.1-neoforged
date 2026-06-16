@@ -59,24 +59,16 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
     public InteractionResult useOn(UseOnContext context) {
         BlockState blockStateClicked = context.getLevel().getBlockState(context.getClickedPos());
         Player user = context.getPlayer();
-        if (user != null && user.isShiftKeyDown() && (blockStateClicked.is(BlockTags.ANVIL) || blockStateClicked.is(Blocks.SMITHING_TABLE)) && context.getLevel().isClientSide) {
-            if (ArsenalCosmetics.isSupporter(user.getUUID())) {
-                UUID weaponOwner = WeaponOwnerComponent.getOwner(user.getItemInHand(context.getHand()));
+        if (user != null && user.isShiftKeyDown() && (blockStateClicked.is(BlockTags.ANVIL) || blockStateClicked.is(Blocks.SMITHING_TABLE))) {
+            if (!context.getLevel().isClientSide) {
                 Skin currentSkin = Skin.fromString(ArsenalCosmetics.getSkin(context.getItemInHand()));
-
                 if (currentSkin == null) {
                     currentSkin = Skin.DEFAULT;
                 }
-
-                ArsenalCosmetics.setSkin(weaponOwner, context.getItemInHand(), Skin.getNext(currentSkin).getName());
-                user.playSound(SoundEvents.SMITHING_TABLE_USE, 0.5f, 1.0f);
-
-                return InteractionResult.SUCCESS;
-            } else {
-                user.displayClientMessage(Component.translatable("tooltip.supporter_only").withStyle(style -> style.withColor(0xCC0000)), false);
-                user.playSound(SoundEvents.SHIELD_BREAK, 0.5f, 1.0f);
-                return InteractionResult.FAIL;
+                ArsenalCosmetics.setSkin(context.getItemInHand(), Skin.getNext(currentSkin).getName());
             }
+            user.playSound(SoundEvents.SMITHING_TABLE_USE, 0.5f, 1.0f);
+            return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
         }
 
         return super.useOn(context);
@@ -92,8 +84,10 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
                 activeAnchor = owner.arsenal$getAnchor(hand, !reeling);
             }
             if (activeAnchor != null && activeAnchor.isAlive()) {
-                if (activeAnchor.isRecallable()) {
-                    activeAnchor.setRecalled(true);
+                // Right-click while a hook is out instantly detaches it: pulling stops and the
+                // blade is removed, leaving the player's current momentum untouched.
+                if (!world.isClientSide) {
+                    activeAnchor.detach();
                 }
                 return InteractionResultHolder.sidedSuccess(stack, world.isClientSide());
             }

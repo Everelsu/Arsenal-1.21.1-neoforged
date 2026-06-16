@@ -9,6 +9,7 @@ import dev.doctor4t.arsenal.entity.BloodScytheEntity;
 import dev.doctor4t.arsenal.index.ArsenalCosmetics;
 import dev.doctor4t.arsenal.index.ArsenalDamageTypes;
 import dev.doctor4t.arsenal.index.ArsenalEnchantments;
+import dev.doctor4t.arsenal.index.ArsenalParticles;
 import dev.doctor4t.arsenal.index.ArsenalSounds;
 import dev.doctor4t.arsenal.util.SweepParticleUtil;
 import dev.doctor4t.arsenal.util.TextUtils;
@@ -43,6 +44,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
@@ -78,23 +80,16 @@ public class ScytheItem extends DiggerItem implements CustomHitParticleItem, Cus
     public InteractionResult useOn(UseOnContext context) {
         BlockState blockStateClicked = context.getLevel().getBlockState(context.getClickedPos());
         Player user = context.getPlayer();
-        if (user != null && user.isShiftKeyDown() && (blockStateClicked.is(BlockTags.ANVIL) || blockStateClicked.is(Blocks.SMITHING_TABLE)) && context.getLevel().isClientSide) {
-            if (ArsenalCosmetics.isSupporter(user.getUUID())) {
-                UUID weaponOwner = WeaponOwnerComponent.getOwner(user.getItemInHand(context.getHand()));
+        if (user != null && user.isShiftKeyDown() && (blockStateClicked.is(BlockTags.ANVIL) || blockStateClicked.is(Blocks.SMITHING_TABLE))) {
+            if (!context.getLevel().isClientSide) {
                 Skin currentSkin = Skin.fromString(ArsenalCosmetics.getSkin(context.getItemInHand()));
-
                 if (currentSkin == null) {
                     currentSkin = Skin.DEFAULT;
                 }
-
-                ArsenalCosmetics.setSkin(weaponOwner, context.getItemInHand(), Skin.getNext(currentSkin).getName());
-                user.playSound(SoundEvents.SMITHING_TABLE_USE, 0.5f, 1.0f);
-                return InteractionResult.SUCCESS;
-            } else {
-                user.displayClientMessage(Component.translatable("tooltip.supporter_only").withStyle(style -> style.withColor(0xCC0000)), false);
-                user.playSound(SoundEvents.SHIELD_BREAK, 0.5f, 1.0f);
-                return InteractionResult.FAIL;
+                ArsenalCosmetics.setSkin(context.getItemInHand(), Skin.getNext(currentSkin).getName());
             }
+            user.playSound(SoundEvents.SMITHING_TABLE_USE, 0.5f, 1.0f);
+            return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
         }
         return super.useOn(context);
     }
@@ -179,6 +174,13 @@ public class ScytheItem extends DiggerItem implements CustomHitParticleItem, Cus
 
             Pair<Integer, Integer> colorPair = new Pair<>(skin.color, skin.shadowColor);
             SweepParticleUtil.sendSweepPacketToClient(serverWorld, colorPair, player.getX() + -Mth.sin((float) (player.getYRot() * (Math.PI / 180F))), player.getY(0.5D), player.getZ() + Mth.cos((float) (player.getYRot() * (Math.PI / 180F))));
+
+            // Blood effect on a fully-charged melee hit: spray blood particles in front of the swing.
+            Vec3 look = player.getLookAngle();
+            double bx = player.getX() + look.x * 1.6;
+            double by = player.getY(0.6D) + look.y * 1.6;
+            double bz = player.getZ() + look.z * 1.6;
+            serverWorld.sendParticles(ArsenalParticles.BLOOD_BUBBLE_SPLATTER.get(), bx, by, bz, 18, 0.35, 0.35, 0.35, 0.05);
         }
     }
 
