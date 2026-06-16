@@ -85,11 +85,12 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
                 activeAnchor = owner.arsenal$getAnchor(hand, !reeling);
             }
             if (activeAnchor != null && activeAnchor.isAlive()) {
-                // Right-click recall, exactly as in Arsenal: the blade flies back to the player
-                // (reeling them along) only if they hold an anchorblade in the other hand.
-                boolean otherHandAnchor = user.getItemInHand(hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND).is(ArsenalItems.ANCHORBLADE.get());
-                activeAnchor.setRecalled(otherHandAnchor);
-                return InteractionResultHolder.fail(stack);
+                // Right-click always recalls the active hook: it stops pulling and flies back to
+                // the player. Works with a single anchorblade (no off-hand requirement).
+                if (!world.isClientSide) {
+                    activeAnchor.setRecalled(true);
+                }
+                return InteractionResultHolder.sidedSuccess(stack, world.isClientSide());
             }
             int riptide = world.registryAccess()
                     .registryOrThrow(Registries.ENCHANTMENT)
