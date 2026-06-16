@@ -6,48 +6,39 @@ import dev.doctor4t.arsenal.index.ArsenalEntities;
 import dev.doctor4t.arsenal.index.ArsenalItems;
 import dev.doctor4t.arsenal.index.ArsenalParticles;
 import dev.doctor4t.arsenal.index.ArsenalSounds;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.world.World;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public class BloodScytheEntity extends PersistentProjectileEntity {
-    private final Set<StatusEffectInstance> effects = Sets.newHashSet();
+public class BloodScytheEntity extends AbstractArrow {
+    private final Set<MobEffectInstance> effects = Sets.newHashSet();
     public int ticksUntilRemove = 5;
     public final List<LivingEntity> hitEntities = new ArrayList<>();
 
-    public BloodScytheEntity(EntityType<? extends PersistentProjectileEntity> entityType, World world) {
-        // FIX: use the two-arg constructor (EntityType, World) — correct for 1.21.1
+    public BloodScytheEntity(EntityType<? extends AbstractArrow> entityType, Level world) {
         super(entityType, world);
     }
 
-    public BloodScytheEntity(World world, LivingEntity owner) {
-        // In 1.21.1, PersistentProjectileEntity requires the 5th arg (weapon) to be non-empty.
-        // Passing ItemStack.EMPTY throws "Invalid weapon firing an arrow".
-        // A fresh scythe stack is sufficient — the weapon arg is only used for enchantment dispatch.
-        super(ArsenalEntities.BLOOD_SCYTHE, owner, world, new ItemStack(ArsenalItems.SCYTHE), new ItemStack(ArsenalItems.SCYTHE));
+    public BloodScytheEntity(Level world, LivingEntity owner) {
+        super(ArsenalEntities.BLOOD_SCYTHE.get(), owner, world, new ItemStack(ArsenalItems.SCYTHE), new ItemStack(ArsenalItems.SCYTHE));
     }
 
-    // Required abstract method in 1.21.1
     @Override
-    protected ItemStack getDefaultItemStack() {
+    protected ItemStack getDefaultPickupItem() {
         return new ItemStack(ArsenalItems.SCYTHE);
     }
 
-    @Override
-    protected ItemStack asItemStack() {
-        return ItemStack.EMPTY;
-    }
-
-    public void addEffect(StatusEffectInstance effect) {
+    public void addEffect(MobEffectInstance effect) {
         this.effects.add(effect);
     }
 
@@ -55,13 +46,14 @@ public class BloodScytheEntity extends PersistentProjectileEntity {
     public void tick() {
         super.tick();
 
+        Vec3 velocity = this.getDeltaMovement();
         for (float x = -3; x <= 3; x += 0.1f) {
-            this.getWorld().addParticle(ArsenalParticles.BLOOD_BUBBLE, this.getX() + x * Math.cos(this.getYaw()), this.getY(), this.getZ() + x * Math.sin(this.getYaw()), this.getVelocity().getX(), this.getVelocity().getY(), this.getVelocity().getZ());
+            this.level().addParticle(ArsenalParticles.BLOOD_BUBBLE.get(), this.getX() + x * Math.cos(this.getYRot()), this.getY(), this.getZ() + x * Math.sin(this.getYRot()), velocity.x, velocity.y, velocity.z);
         }
 
-        if (this.inGround || this.age > 20) {
+        if (this.inGround || this.tickCount > 20) {
             for (int i = 0; i < 50; i++) {
-                this.getWorld().addParticle(ArsenalParticles.BLOOD_BUBBLE_SPLATTER, this.getX() + (this.random.nextGaussian() * 2) * Math.cos(this.getYaw()), this.getY(), this.getZ() + (this.random.nextGaussian() * 2) * Math.sin(this.getYaw()), this.random.nextGaussian() / 10, this.random.nextFloat() / 2, this.random.nextGaussian() / 10);
+                this.level().addParticle(ArsenalParticles.BLOOD_BUBBLE_SPLATTER.get(), this.getX() + (this.random.nextGaussian() * 2) * Math.cos(this.getYRot()), this.getY(), this.getZ() + (this.random.nextGaussian() * 2) * Math.sin(this.getYRot()), this.random.nextGaussian() / 10, this.random.nextFloat() / 2, this.random.nextGaussian() / 10);
             }
             this.ticksUntilRemove--;
         }
@@ -70,12 +62,12 @@ public class BloodScytheEntity extends PersistentProjectileEntity {
             this.discard();
         }
 
-        if (!this.getWorld().isClient) {
-            for (LivingEntity livingEntity : this.getWorld().getEntitiesByClass(LivingEntity.class, this.getBoundingBox(), livingEntity -> this.getOwner() != livingEntity)) {
+        if (!this.level().isClientSide) {
+            for (LivingEntity livingEntity : this.level().getEntitiesOfClass(LivingEntity.class, this.getBoundingBox(), livingEntity -> this.getOwner() != livingEntity)) {
                 if (!hitEntities.contains(livingEntity)) {
-                    livingEntity.damage(this.getWorld().getDamageSources().create(ArsenalDamageTypes.BLOOD_SCYTHE, this, this.getOwner()), 12.0f);
-                    for (StatusEffectInstance effect : this.effects) {
-                        livingEntity.addStatusEffect(effect);
+                    livingEntity.hurt(ArsenalDamageTypes.source(this.level(), ArsenalDamageTypes.BLOOD_SCYTHE, this, this.getOwner()), 12.0f);
+                    for (MobEffectInstance effect : this.effects) {
+                        livingEntity.addEffect(effect);
                     }
                     hitEntities.add(livingEntity);
                 }
@@ -84,16 +76,16 @@ public class BloodScytheEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    protected SoundEvent getHitSound() {
-        return ArsenalSounds.ENTITY_BLOOD_SCYTHE_HIT;
+    protected SoundEvent getDefaultHitGroundSoundEvent() {
+        return ArsenalSounds.ENTITY_BLOOD_SCYTHE_HIT.get();
     }
 
     @Override
-    public boolean hasNoGravity() {
+    public boolean isNoGravity() {
         return true;
     }
 
     @Override
-    protected void onEntityHit(EntityHitResult entityHitResult) {
+    protected void onHitEntity(EntityHitResult entityHitResult) {
     }
 }

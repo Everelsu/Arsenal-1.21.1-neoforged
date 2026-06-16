@@ -1,12 +1,12 @@
 package dev.doctor4t.arsenal.util;
 
 import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 public interface AnchorOwner {
-    void arsenal$setAnchor(Hand hand, AnchorbladeEntity anchor);
+    void arsenal$setAnchor(InteractionHand hand, AnchorbladeEntity anchor);
 
-    AnchorbladeEntity arsenal$getAnchor(Hand hand, boolean reeling);
+    AnchorbladeEntity arsenal$getAnchor(InteractionHand hand, boolean reeling);
 
-    boolean arsenal$isAnchorActive(Hand hand, boolean reeling);
+    boolean arsenal$isAnchorActive(InteractionHand hand, boolean reeling);
 }

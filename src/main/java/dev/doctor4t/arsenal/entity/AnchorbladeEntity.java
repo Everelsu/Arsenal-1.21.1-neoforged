@@ -1,53 +1,52 @@
 package dev.doctor4t.arsenal.entity;
 
 import dev.doctor4t.arsenal.index.*;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import dev.doctor4t.arsenal.network.ShockwavePayload;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.network.PacketDistributor;
 
-public class AnchorbladeEntity extends PersistentProjectileEntity {
-    private static final TrackedData<Byte> ANCHOR_FLAGS = DataTracker.registerData(AnchorbladeEntity.class, TrackedDataHandlerRegistry.BYTE);
-    private static final TrackedData<ItemStack> ITEM = DataTracker.registerData(AnchorbladeEntity.class, TrackedDataHandlerRegistry.ITEM_STACK);
+public class AnchorbladeEntity extends AbstractArrow {
+    private static final EntityDataAccessor<Byte> ANCHOR_FLAGS = SynchedEntityData.defineId(AnchorbladeEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<ItemStack> ITEM = SynchedEntityData.defineId(AnchorbladeEntity.class, EntityDataSerializers.ITEM_STACK);
 
     public int returnTimer;
 
-    public AnchorbladeEntity(EntityType<? extends AnchorbladeEntity> entityType, World world) {
-        // FIX: use the two-arg constructor (EntityType, World) — no item stacks here
+    public AnchorbladeEntity(EntityType<? extends AnchorbladeEntity> entityType, Level world) {
         super(entityType, world);
     }
 
-    public AnchorbladeEntity(World world, LivingEntity owner, ItemStack stack) {
-        // In 1.21.1, PersistentProjectileEntity(EntityType, LivingEntity, World, ItemStack projectile, ItemStack weapon)
-        // requires the WEAPON (5th arg) to be non-empty — passing EMPTY throws "Invalid weapon firing an arrow".
-        // The first ItemStack is the visual/projectile item; the second is the weapon that fired it
-        // (used for enchantment effects like piercing). Pass the anchorblade stack as the weapon.
-        super(ArsenalEntities.ANCHORBLADE, owner, world, new ItemStack(ArsenalItems.ANCHORBLADE), stack);
+    public AnchorbladeEntity(Level world, LivingEntity owner, ItemStack stack) {
+        super(ArsenalEntities.ANCHORBLADE.get(), owner, world, new ItemStack(ArsenalItems.ANCHORBLADE), stack);
         this.setItem(stack.copy());
         this.setNoGravity(true);
         this.setReeling(ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, world) > 0);
     }
 
     public void setItem(ItemStack stack) {
-        if (!stack.isOf(Items.ENDER_EYE) || !stack.getComponentChanges().isEmpty()) {
-            this.getDataTracker().set(ITEM, stack.copyWithCount(1));
+        if (!stack.is(Items.ENDER_EYE) || !stack.getComponentsPatch().isEmpty()) {
+            this.getEntityData().set(ITEM, stack.copyWithCount(1));
         }
     }
 
     private ItemStack getTrackedItem() {
-        return this.getDataTracker().get(ITEM);
+        return this.getEntityData().get(ITEM);
     }
 
     public ItemStack getStack() {
@@ -56,10 +55,10 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    protected void initDataTracker(DataTracker.Builder builder) {
-        super.initDataTracker(builder);
-        builder.add(ANCHOR_FLAGS, (byte) 0);
-        builder.add(ITEM, ItemStack.EMPTY);
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(ANCHOR_FLAGS, (byte) 0);
+        builder.define(ITEM, ItemStack.EMPTY);
     }
 
     @Override
@@ -67,41 +66,27 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
         Entity owner = this.getOwner();
         double d = 2;
 
-        if (!this.getWorld().isClient) {
+        if (!this.level().isClientSide) {
             if (owner == null || !owner.isAlive()) {
                 this.discard();
                 return;
             }
-            if (this.hasDealtDamage() || this.isNoClip() || this.isRecalled()) {
-                // isRecalled() is an extra safety gate: if right-click recall fired but
-                // setDealtDamage somehow didn't propagate, the blade still flies home.
-                this.setNoClip(true);
-                Vec3d vec3d = owner.getEyePos().subtract(this.getPos());
+            if (this.hasDealtDamage() || this.isNoPhysics() || this.isRecalled()) {
+                this.setNoPhysics(true);
+                Vec3 vec3d = owner.getEyePosition().subtract(this.position());
 
                 double length = vec3d.length();
-                // Cap at 1.5 blocks/tick so the blade visibly travels home rather than
-                // teleporting. At close range (length < 1.5) it scales down naturally
-                // so it doesn't overshoot. d*3 (= 6) was the old cap — far too fast.
-                this.setVelocity(vec3d.normalize().multiply(Math.min(length, 2.5)));
+                this.setDeltaMovement(vec3d.normalize().scale(Math.min(length, 2.5)));
             }
-            if (this.getPos().distanceTo(owner.getPos()) > 30) {
+            if (this.position().distanceTo(owner.position()) > 30) {
                 this.setDealtDamage(true);
             }
         }
 
-        // Snapshot inGround BEFORE super.tick() so we can detect the landing transition.
-        // super.tick() is what actually sets inGround = true (inside PersistentProjectileEntity.tick()
-        // via the block-collision raycast). If we check inGround before calling super.tick(),
-        // it will always be false on the landing tick and the shockwave block never fires.
         boolean wasInGround = this.inGround;
 
         super.tick();
 
-        // Now inGround is up-to-date. Only enter the block on the tick we first land
-        // (wasInGround=false → inGround=true) OR on subsequent ticks while embedded
-        // (wasInGround=true → inGround=true). hasDealtDamage() gates repeated execution:
-        // setDealtDamage(true) is called at the end of the else-branch so the shockwave
-        // + knockback fire exactly once, and the reeling branch uses returnTimer instead.
         if (this.inGround && !this.hasDealtDamage()) {
             if (this.hasReeling()) {
                 if (this.returnTimer++ > 100) {
@@ -112,37 +97,32 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
                     return;
                 }
                 float e = (float) (d / 5f);
-                Vec3d vec3d = this.getPos().subtract(owner.getEyePos());
-                owner.setVelocity(owner.getVelocity().multiply(0.95).add(vec3d.normalize().multiply(e)));
+                Vec3 vec3d = this.position().subtract(owner.getEyePosition());
+                owner.setDeltaMovement(owner.getDeltaMovement().scale(0.95).add(vec3d.normalize().scale(e)));
                 owner.fallDistance = 0;
             } else {
                 float radius = 5f;
-                // Spawn the shockwave particle on landing.
-                // Client side: call addParticle() directly — ClientWorld.addParticle() is NOT a no-op,
-                // unlike the World base class. This covers singleplayer and the local player in multiplayer.
-                // Server side: send ShockwavePayload so all OTHER connected players also see it.
-                if (this.getWorld().isClient) {
-                    this.getWorld().addParticle(ArsenalParticles.SHOCKWAVE,
+                if (this.level().isClientSide) {
+                    this.level().addParticle(ArsenalParticles.SHOCKWAVE.get(),
                             this.getX(), this.getY(), this.getZ(), 0, 0, 0);
-                } else if (this.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld) {
-                    dev.doctor4t.arsenal.network.ShockwavePayload payload =
-                            new dev.doctor4t.arsenal.network.ShockwavePayload(this.getX(), this.getY(), this.getZ());
-                    for (net.minecraft.server.network.ServerPlayerEntity player : serverWorld.getPlayers()) {
-                        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
+                } else if (this.level() instanceof ServerLevel serverWorld) {
+                    ShockwavePayload payload = new ShockwavePayload(this.getX(), this.getY(), this.getZ());
+                    for (ServerPlayer player : serverWorld.players()) {
+                        PacketDistributor.sendToPlayer(player, payload);
                     }
                 }
-                for (LivingEntity hitLivingEntity : this.getWorld().getEntitiesByClass(LivingEntity.class, this.getBoundingBox().expand(radius), LivingEntity::isAlive)) {
+                for (LivingEntity hitLivingEntity : this.level().getEntitiesOfClass(LivingEntity.class, this.getBoundingBox().inflate(radius), LivingEntity::isAlive)) {
                     float strength = this.getKnockbackForEntity(hitLivingEntity);
                     if (!(strength <= 0.0)) {
-                        this.velocityDirty = true;
-                        Vec3d distance = hitLivingEntity.getPos().add(0, hitLivingEntity.getHeight() / 2f, 0).subtract(this.getPos());
-                        Vec3d footDistance = hitLivingEntity.getPos().subtract(this.getPos());
+                        this.hasImpulse = true;
+                        Vec3 distance = hitLivingEntity.position().add(0, hitLivingEntity.getBbHeight() / 2f, 0).subtract(this.position());
+                        Vec3 footDistance = hitLivingEntity.position().subtract(this.position());
                         if (footDistance.y > distance.y) {
                             distance = footDistance;
                         }
-                        float proximity = (float) MathHelper.lerp(MathHelper.clamp(distance.length() / radius, 0, 1), 1, 0);
-                        Vec3d direction = distance.normalize().multiply(proximity * strength);
-                        hitLivingEntity.addVelocity(direction.x, direction.y, direction.z);
+                        float proximity = (float) Mth.lerp(Mth.clamp(distance.length() / radius, 0, 1), 1, 0);
+                        Vec3 direction = distance.normalize().scale(proximity * strength);
+                        hitLivingEntity.push(direction.x, direction.y, direction.z);
                         hitLivingEntity.fallDistance = 0;
                     }
                 }
@@ -152,87 +132,77 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    public void setPitch(float pitch) {
+    public void setXRot(float pitch) {
         if (!this.hasDealtDamage()) {
-            super.setPitch(pitch);
+            super.setXRot(pitch);
         }
     }
 
     @Override
-    public void setYaw(float yaw) {
+    public void setYRot(float yaw) {
         if (!this.hasDealtDamage()) {
-            super.setYaw(yaw);
+            super.setYRot(yaw);
         }
     }
 
     @Override
-    protected void onEntityHit(EntityHitResult entityHitResult) {
+    protected void onHitEntity(EntityHitResult entityHitResult) {
         Entity hitEntity = entityHitResult.getEntity();
         float damage = 10F;
         Entity owner = this.getOwner();
         this.setDealtDamage(true);
-        SoundEvent soundEvent = this.getHitSound();
-        hitEntity.timeUntilRegen = 0;
-        if (hitEntity.damage(this.getWorld().getDamageSources().create(ArsenalDamageTypes.ANCHOR, this, this.getOwner()), damage)) {
+        SoundEvent soundEvent = this.getDefaultHitGroundSoundEvent();
+        hitEntity.invulnerableTime = 0;
+        if (hitEntity.hurt(ArsenalDamageTypes.source(this.level(), ArsenalDamageTypes.ANCHOR, this, this.getOwner()), damage)) {
             if (hitEntity.getType() == EntityType.ENDERMAN) {
                 return;
             }
 
             if (hitEntity instanceof LivingEntity hitLivingEntity) {
-                if (owner instanceof LivingEntity livingOwner) {
-                    // FIX: applyDamageEffects(LivingEntity, LivingEntity) was removed in 1.21.1.
-                    // Enchantment on-hit effects are now fully data-driven and triggered automatically
-                    // by the damage pipeline. No manual call needed here.
-
+                if (owner instanceof LivingEntity) {
                     float strength = this.getKnockbackForEntity(hitLivingEntity);
                     if (!(strength <= 0.0)) {
-                        this.velocityDirty = true;
-                        Vec3d dir = hitLivingEntity.getPos().subtract(owner.getPos()).normalize().multiply(strength);
+                        this.hasImpulse = true;
+                        Vec3 dir = hitLivingEntity.position().subtract(owner.position()).normalize().scale(strength);
                         if (this.hasReeling()) {
-                            dir = owner.getPos().subtract(hitLivingEntity.getPos()).multiply(strength / 10f);
+                            dir = owner.position().subtract(hitLivingEntity.position()).scale(strength / 10f);
                         }
-                        hitLivingEntity.addVelocity(dir.x, dir.y, dir.z);
+                        hitLivingEntity.push(dir.x, dir.y, dir.z);
                     }
                 }
-                this.onHit(hitLivingEntity);
+                this.doPostHurtEffects(hitLivingEntity);
             }
 
-            if (this.getOwner() instanceof PlayerEntity player && !player.isCreative()) {
-                player.getItemCooldownManager().set(ArsenalItems.ANCHORBLADE, 40);
+            if (this.getOwner() instanceof Player player && !player.isCreative()) {
+                player.getCooldowns().addCooldown(ArsenalItems.ANCHORBLADE.get(), 40);
             }
         }
-        this.setVelocity(this.getVelocity().multiply(-0.01, -0.1, -0.01));
+        this.setDeltaMovement(this.getDeltaMovement().multiply(-0.01, -0.1, -0.01));
         this.playSound(soundEvent, 1.0f, 1.0f);
     }
 
     private float getKnockbackForEntity(LivingEntity hitLivingEntity) {
-        return (float) (1f * (1.0 - hitLivingEntity.getAttributeValue(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)));
+        return (float) (1f * (1.0 - hitLivingEntity.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE)));
     }
 
     @Override
-    protected boolean tryPickup(PlayerEntity player) {
-        return this.isOwner(player);
+    protected boolean tryPickup(Player player) {
+        return this.ownedBy(player);
     }
 
     @Override
-    protected float getDragInWater() {
+    protected float getWaterInertia() {
         return 0.99F;
     }
 
     @Override
-    protected SoundEvent getHitSound() {
-        return ArsenalSounds.ENTITY_ANCHORBLADE_LAND;
+    protected SoundEvent getDefaultHitGroundSoundEvent() {
+        return ArsenalSounds.ENTITY_ANCHORBLADE_LAND.get();
     }
 
-    // Required abstract method in 1.21.1 - returns the item this projectile represents
     @Override
-    protected ItemStack getDefaultItemStack() {
+    protected ItemStack getDefaultPickupItem() {
         return new ItemStack(ArsenalItems.ANCHORBLADE);
-    }
-
-    @Override
-    protected ItemStack asItemStack() {
-        return ItemStack.EMPTY;
     }
 
     @Override
@@ -260,25 +230,14 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
         return this.getAnchorFlag(2);
     }
 
-    /**
-     * Returns true when a right-click recall is allowed:
-     * - blade must have the Reeling enchantment (non-reeling blade auto-returns on its own)
-     * - blade must currently be embedded in the ground
-     * - blade must have been in the ground for at least 30 ticks (~1.5 s) so the
-     *   player has a moment of being pulled before they can cut it short
-     */
     public boolean isRecallable() {
         return this.hasReeling() && this.inGround && this.returnTimer >= 10;
     }
 
     public void setRecalled(boolean recalled) {
         if (recalled) {
-            // Free the blade from the ground so it can fly home.
-            // setDealtDamage(true) activates the return-home velocity block in tick(),
-            // but super.tick() on a grounded (inGround=true) projectile ignores velocity.
-            // setNoClip(true) + inGround=false lets the blade actually move next tick.
             this.setDealtDamage(true);
-            this.setNoClip(true);
+            this.setNoPhysics(true);
             this.inGround = false;
         }
         this.setAnchorFlag(2, recalled);
@@ -288,7 +247,7 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
         if (flag < 0 || flag > 8) {
             return false;
         }
-        return (this.dataTracker.get(ANCHOR_FLAGS) >> flag & 0x01) == 1;
+        return (this.getEntityData().get(ANCHOR_FLAGS) >> flag & 0x01) == 1;
     }
 
     private void setAnchorFlag(int flag, boolean value) {
@@ -296,9 +255,9 @@ public class AnchorbladeEntity extends PersistentProjectileEntity {
             return;
         }
         if (value) {
-            this.dataTracker.set(ANCHOR_FLAGS, (byte) (this.dataTracker.get(ANCHOR_FLAGS) | 1 << flag));
+            this.getEntityData().set(ANCHOR_FLAGS, (byte) (this.getEntityData().get(ANCHOR_FLAGS) | 1 << flag));
         } else {
-            this.dataTracker.set(ANCHOR_FLAGS, (byte) (this.dataTracker.get(ANCHOR_FLAGS) & ~(1 << flag)));
+            this.getEntityData().set(ANCHOR_FLAGS, (byte) (this.getEntityData().get(ANCHOR_FLAGS) & ~(1 << flag)));
         }
     }
 }

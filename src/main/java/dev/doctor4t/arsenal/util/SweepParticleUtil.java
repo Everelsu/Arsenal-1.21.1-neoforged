@@ -1,16 +1,16 @@
 package dev.doctor4t.arsenal.util;
 
+import com.mojang.datafixers.util.Pair;
 import dev.doctor4t.arsenal.network.SweepPayload;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Pair;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public class SweepParticleUtil {
-    public static void sendSweepPacketToClient(ServerWorld world, Pair<Integer, Integer> colorPair, double x, double y, double z) {
-        SweepPayload payload = new SweepPayload(colorPair.getLeft(), colorPair.getRight(), x, y, z);
-        for (ServerPlayerEntity serverPlayerEntity : world.getPlayers()) {
-            ServerPlayNetworking.send(serverPlayerEntity, payload);
+    public static void sendSweepPacketToClient(ServerLevel world, Pair<Integer, Integer> colorPair, double x, double y, double z) {
+        SweepPayload payload = new SweepPayload(colorPair.getFirst(), colorPair.getSecond(), x, y, z);
+        for (ServerPlayer serverPlayer : world.players()) {
+            PacketDistributor.sendToPlayer(serverPlayer, payload);
         }
     }
 }

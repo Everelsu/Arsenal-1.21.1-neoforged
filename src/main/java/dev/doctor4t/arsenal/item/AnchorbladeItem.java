@@ -1,199 +1,184 @@
 package dev.doctor4t.arsenal.item;
 
+import com.mojang.datafixers.util.Pair;
 import dev.doctor4t.arsenal.Arsenal;
 import dev.doctor4t.arsenal.cca.WeaponOwnerComponent;
+import dev.doctor4t.arsenal.compat.CustomHitParticleItem;
+import dev.doctor4t.arsenal.compat.CustomHitSoundItem;
 import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
 import dev.doctor4t.arsenal.index.ArsenalCosmetics;
 import dev.doctor4t.arsenal.index.ArsenalEnchantments;
-import dev.doctor4t.arsenal.index.ArsenalItems;
-import dev.doctor4t.arsenal.index.ArsenalSounds;
 import dev.doctor4t.arsenal.util.AnchorOwner;
 import dev.doctor4t.arsenal.util.SweepParticleUtil;
-import dev.doctor4t.ratatouille.item.CustomHitParticleItem;
-import dev.doctor4t.ratatouille.item.CustomHitSoundItem;
-import dev.doctor4t.ratatouille.util.TextUtils;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemUsageContext;
-import net.minecraft.item.PickaxeItem;
-import net.minecraft.item.ToolMaterial;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.*;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
+import dev.doctor4t.arsenal.util.TextUtils;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.stats.Stats;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.PickaxeItem;
+import net.minecraft.world.item.Tier;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 import java.util.UUID;
 
 public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleItem, CustomHitSoundItem, ArsenalWeaponItem {
-    public AnchorbladeItem(ToolMaterial material, int attackDamage, float attackSpeed, Settings settings) {
-        super(material, settings.attributeModifiers(
-                PickaxeItem.createAttributeModifiers(material, attackDamage, attackSpeed)
+    public AnchorbladeItem(Tier material, int attackDamage, float attackSpeed, Properties settings) {
+        super(material, settings.attributes(
+                PickaxeItem.createAttributes(material, attackDamage, attackSpeed)
         ));
     }
 
     @Override
-    public ActionResult useOnBlock(ItemUsageContext context) {
-        BlockState blockStateClicked = context.getWorld().getBlockState(context.getBlockPos());
-        PlayerEntity user = context.getPlayer();
-        if (user != null && user.isSneaking() && (blockStateClicked.isIn(BlockTags.ANVIL) || blockStateClicked.isOf(Blocks.SMITHING_TABLE)) && context.getWorld().isClient) {
-            if (ArsenalCosmetics.isSupporter(user.getUuid())) {
-                UUID weaponOwner = WeaponOwnerComponent.getOwner(user.getStackInHand(context.getHand()));
-                Skin currentSkin = Skin.fromString(ArsenalCosmetics.getSkin(context.getStack()));
+    public InteractionResult useOn(UseOnContext context) {
+        BlockState blockStateClicked = context.getLevel().getBlockState(context.getClickedPos());
+        Player user = context.getPlayer();
+        if (user != null && user.isShiftKeyDown() && (blockStateClicked.is(BlockTags.ANVIL) || blockStateClicked.is(Blocks.SMITHING_TABLE)) && context.getLevel().isClientSide) {
+            if (ArsenalCosmetics.isSupporter(user.getUUID())) {
+                UUID weaponOwner = WeaponOwnerComponent.getOwner(user.getItemInHand(context.getHand()));
+                Skin currentSkin = Skin.fromString(ArsenalCosmetics.getSkin(context.getItemInHand()));
 
                 if (currentSkin == null) {
                     currentSkin = Skin.DEFAULT;
                 }
 
-                ArsenalCosmetics.setSkin(weaponOwner, context.getStack(), Skin.getNext(currentSkin).getName());
-                context.getPlayer().playSound(SoundEvents.BLOCK_SMITHING_TABLE_USE, 0.5f, 1.0f);
+                ArsenalCosmetics.setSkin(weaponOwner, context.getItemInHand(), Skin.getNext(currentSkin).getName());
+                user.playSound(SoundEvents.SMITHING_TABLE_USE, 0.5f, 1.0f);
 
-                return ActionResult.SUCCESS;
+                return InteractionResult.SUCCESS;
             } else {
-                if (context.getWorld().isClient) {
-                    user.sendMessage(Text.translatable("tooltip.supporter_only").styled(style -> style.withColor(0xCC0000)));
-                    context.getPlayer().playSound(SoundEvents.ITEM_SHIELD_BREAK, 0.5f, 1.0f);
-                }
-                return ActionResult.FAIL;
+                user.displayClientMessage(Component.translatable("tooltip.supporter_only").withStyle(style -> style.withColor(0xCC0000)), false);
+                user.playSound(SoundEvents.SHIELD_BREAK, 0.5f, 1.0f);
+                return InteractionResult.FAIL;
             }
         }
 
-        return super.useOnBlock(context);
+        return super.useOn(context);
     }
 
     @Override
-    public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        ItemStack stack = user.getStackInHand(hand);
+    public InteractionResultHolder<ItemStack> use(Level world, Player user, InteractionHand hand) {
+        ItemStack stack = user.getItemInHand(hand);
         if (user instanceof AnchorOwner owner) {
             boolean reeling = ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, world) > 0;
-            // Check both reeling states — the blade in flight might not match the current
-            // enchantment state of the item (e.g. if the stack changed), so try both.
-            // Prefer the state matching the current enchant, fall back to the other.
             AnchorbladeEntity activeAnchor = owner.arsenal$getAnchor(hand, reeling);
             if (activeAnchor == null || !activeAnchor.isAlive()) {
                 activeAnchor = owner.arsenal$getAnchor(hand, !reeling);
             }
             if (activeAnchor != null && activeAnchor.isAlive()) {
                 if (activeAnchor.isRecallable()) {
-                    // isRecallable() requires: Reeling enchantment, blade in ground,
-                    // and >= 30 ticks (~1.5 s) grounded. All three must pass.
                     activeAnchor.setRecalled(true);
                 }
-                // Either way, suppress a new throw while a blade is still out.
-                return TypedActionResult.success(stack, world.isClient());
+                return InteractionResultHolder.sidedSuccess(stack, world.isClientSide());
             }
-            int riptide = world.getRegistryManager()
-                    .get(net.minecraft.registry.RegistryKeys.ENCHANTMENT)
-                    .getEntry(net.minecraft.enchantment.Enchantments.RIPTIDE)
-                    .map(entry -> EnchantmentHelper.getLevel(entry, stack))
+            int riptide = world.registryAccess()
+                    .registryOrThrow(Registries.ENCHANTMENT)
+                    .getHolder(Enchantments.RIPTIDE)
+                    .map(entry -> EnchantmentHelper.getItemEnchantmentLevel(entry, stack))
                     .orElse(0);
 
-            // FIX: Original logic had `return TypedActionResult.success(...)` inside `!world.isClient`,
-            // meaning the client never got a success result and the throw appeared to do nothing.
-            // The entity spawning must stay server-only, but the success return must happen on both sides.
-            // Also removed the `riptide <= 0 || isTouchingWaterOrRain()` outer condition that was
-            // preventing throws on dry land without riptide — the anchorblade should always throw.
             if (riptide == 0) {
-                // Normal throw — always allowed
-                if (!world.isClient) {
-                    stack.damage(1, user, hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+                if (!world.isClientSide) {
+                    stack.hurtAndBreak(1, user, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
                     AnchorbladeEntity anchorbladeEntity = new AnchorbladeEntity(world, user, stack);
-                    anchorbladeEntity.setVelocity(user, user.getPitch(), user.getYaw(), 0.0F, 2.5F, 1.0F);
+                    anchorbladeEntity.shootFromRotation(user, user.getXRot(), user.getYRot(), 0.0F, 2.5F, 1.0F);
                     owner.arsenal$setAnchor(hand, anchorbladeEntity);
-                    world.spawnEntity(anchorbladeEntity);
-                    world.playSoundFromEntity(null, anchorbladeEntity, ArsenalSounds.ITEM_ANCHORBLADE_THROW, SoundCategory.PLAYERS, 1.0F, 1.0F);
+                    world.addFreshEntity(anchorbladeEntity);
+                    world.playSound(null, anchorbladeEntity, ArsenalSounds.ITEM_ANCHORBLADE_THROW.get(), SoundSource.PLAYERS, 1.0F, 1.0F);
                 }
-                user.incrementStat(Stats.USED.getOrCreateStat(this));
-                return TypedActionResult.success(user.getStackInHand(hand), world.isClient());
-            } else if (user.isTouchingWaterOrRain()) {
-                // Riptide throw — only in water/rain
-                if (!world.isClient) {
-                    stack.damage(1, user, hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+                user.awardStat(Stats.ITEM_USED.get(this));
+                return InteractionResultHolder.sidedSuccess(user.getItemInHand(hand), world.isClientSide());
+            } else if (user.isInWaterOrRain()) {
+                if (!world.isClientSide) {
+                    stack.hurtAndBreak(1, user, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
                 }
-                user.incrementStat(Stats.USED.getOrCreateStat(this));
-                return TypedActionResult.success(user.getStackInHand(hand), world.isClient());
+                user.awardStat(Stats.ITEM_USED.get(this));
+                return InteractionResultHolder.sidedSuccess(user.getItemInHand(hand), world.isClientSide());
             }
         }
-        return TypedActionResult.success(user.getStackInHand(hand));
+        return InteractionResultHolder.success(user.getItemInHand(hand));
     }
 
     @Override
-    public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag type) {
         Skin skin = Skin.fromString(ArsenalCosmetics.getSkin(stack));
 
         if (skin != null && skin != Skin.DEFAULT) {
-            tooltip.add(Text.literal(skin.tooltipName != null ? skin.tooltipName : TextUtils.formatValueString(skin.getName())).styled(style -> style.withColor(skin.getFirstColor())));
+            tooltip.add(Component.literal(skin.tooltipName != null ? skin.tooltipName : TextUtils.formatValueString(skin.getName())).withStyle(style -> style.withColor(skin.getFirstColor())));
             if (skin.lore != null) {
                 if (Screen.hasShiftDown()) {
-                    MutableText translatable = Text.translatable(skin.lore);
+                    MutableComponent translatable = Component.translatable(skin.lore);
                     for (String line : translatable.getString().split("\n")) {
-                        tooltip.add(Text.literal(line).styled(style -> style.withColor(Formatting.DARK_GRAY)));
+                        tooltip.add(Component.literal(line).withStyle(style -> style.withColor(ChatFormatting.DARK_GRAY)));
                     }
                 } else {
-                    tooltip.add(Text.translatable("tooltip.arsenal.hidden").styled(style -> style.withColor(Formatting.DARK_GRAY)));
+                    tooltip.add(Component.translatable("tooltip.arsenal.hidden").withStyle(style -> style.withColor(ChatFormatting.DARK_GRAY)));
                 }
             }
         }
 
-        super.appendTooltip(stack, context, tooltip, type);
+        super.appendHoverText(stack, context, tooltip, type);
     }
 
     @Override
-    public void spawnHitParticles(PlayerEntity player) {
-        if (player.getWorld() instanceof ServerWorld serverWorld) {
+    public void spawnHitParticles(Player player) {
+        if (player.level() instanceof ServerLevel serverWorld) {
             Skin skin = Skin.DEFAULT;
-            Skin toSkin = Skin.fromString(ArsenalCosmetics.getSkin(player.getMainHandStack()));
+            Skin toSkin = Skin.fromString(ArsenalCosmetics.getSkin(player.getMainHandItem()));
             if (toSkin != null) {
                 skin = toSkin;
             }
 
             Pair<Integer, Integer> colorPair = new Pair<>(skin.getFirstColor(), skin.getSecondColor());
-            SweepParticleUtil.sendSweepPacketToClient(serverWorld, colorPair, player.getX() + -MathHelper.sin((float) (player.getYaw() * (Math.PI / 180F))), player.getBodyY(0.5D), player.getZ() + MathHelper.cos((float) (player.getYaw() * (Math.PI / 180F))));
+            SweepParticleUtil.sendSweepPacketToClient(serverWorld, colorPair, player.getX() + -Mth.sin((float) (player.getYRot() * (Math.PI / 180F))), player.getY(0.5D), player.getZ() + Mth.cos((float) (player.getYRot() * (Math.PI / 180F))));
         }
     }
 
     @Override
-    public void playHitSound(PlayerEntity player) {
-        player.playSound(ArsenalSounds.ITEM_ANCHORBLADE_HIT, 1.0F, (float) (1.0F + player.getRandom().nextGaussian() / 10f));
+    public void playHitSound(Player player) {
+        player.playSound(ArsenalSounds.ITEM_ANCHORBLADE_HIT.get(), 1.0F, (float) (1.0F + player.getRandom().nextGaussian() / 10f));
     }
 
     @Override
-    public boolean canMine(BlockState state, World world, BlockPos pos, PlayerEntity miner) {
+    public boolean canAttackBlock(BlockState state, Level world, BlockPos pos, Player miner) {
         return !miner.isCreative();
     }
 
     @Override
-    public void inventoryTick(ItemStack stack, World world, Entity entity, int slot, boolean selected) {
+    public void inventoryTick(ItemStack stack, Level world, Entity entity, int slot, boolean selected) {
         super.inventoryTick(stack, world, entity, slot, selected);
 
-        if (entity instanceof PlayerEntity player) {
-            WeaponOwnerComponent.setOwner(stack, player.getUuid());
+        if (entity instanceof Player player) {
+            WeaponOwnerComponent.setOwner(stack, player.getUUID());
         }
     }
 
     public enum Skin {
-        // color, shadowColor, tooltipName, lore
-        // anchorbladeEntityModel: Identifier for the in-hand model used when the entity is rendered (thrown)
-        // chainTexture: Identifier for the entity/chain texture drawn between player and thrown blade
         DEFAULT (0xFFD9D9D9, 0xFF7F8885, null, null,
                 Arsenal.id("item/anchorblade_in_hand"),           Arsenal.id("textures/entity/chain.png")),
         LUXINTRUS(0xFF8E00FF, 0xFF5500AA, null, null,
@@ -211,13 +196,11 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
         public final int shadowColor;
         public final @Nullable String lore;
         public final @Nullable String tooltipName;
-        /** Identifier for the BakedModel used when rendering the thrown AnchorbladeEntity. */
-        public final net.minecraft.util.Identifier anchorbladeEntityModel;
-        /** Identifier for the chain texture rendered between the player and the thrown blade. */
-        public final net.minecraft.util.Identifier chainTexture;
+        public final ResourceLocation anchorbladeEntityModel;
+        public final ResourceLocation chainTexture;
 
         Skin(int color, int shadowColor, @Nullable String tooltipName, @Nullable String lore,
-             net.minecraft.util.Identifier anchorbladeEntityModel, net.minecraft.util.Identifier chainTexture) {
+             ResourceLocation anchorbladeEntityModel, ResourceLocation chainTexture) {
             this.color = color;
             this.shadowColor = shadowColor;
             this.lore = lore;

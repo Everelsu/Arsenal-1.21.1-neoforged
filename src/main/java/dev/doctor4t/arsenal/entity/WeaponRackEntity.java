@@ -3,68 +3,71 @@ package dev.doctor4t.arsenal.entity;
 import dev.doctor4t.arsenal.index.ArsenalEntities;
 import dev.doctor4t.arsenal.index.ArsenalItems;
 import dev.doctor4t.arsenal.index.ArsenalTags;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.decoration.ItemFrameEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.decoration.HangingEntity;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
-public class WeaponRackEntity extends ItemFrameEntity {
+import java.util.function.Predicate;
 
-    public WeaponRackEntity(EntityType<? extends WeaponRackEntity> entityType, World world) {
+public class WeaponRackEntity extends ItemFrame {
+    private static final Predicate<Entity> HANGABLE = entity -> entity instanceof HangingEntity;
+
+    public WeaponRackEntity(EntityType<? extends WeaponRackEntity> entityType, Level world) {
         super(entityType, world);
     }
 
-    public WeaponRackEntity(World world, BlockPos pos, Direction facing) {
-        this(ArsenalEntities.WEAPON_RACK, world, pos, facing);
+    public WeaponRackEntity(Level world, BlockPos pos, Direction facing) {
+        this(ArsenalEntities.WEAPON_RACK.get(), world, pos, facing);
     }
 
-    public WeaponRackEntity(EntityType<? extends WeaponRackEntity> type, World world, BlockPos pos, Direction facing) {
+    public WeaponRackEntity(EntityType<? extends WeaponRackEntity> type, Level world, BlockPos pos, Direction facing) {
         super(type, world, pos, facing);
     }
 
     @Override
-    public ActionResult interact(PlayerEntity player, Hand hand) {
-        if (player.isSneaking() && !this.getHeldItemStack().isEmpty()) {
+    public InteractionResult interact(Player player, InteractionHand hand) {
+        if (player.isShiftKeyDown() && !this.getItem().isEmpty()) {
             this.setInvisible(!this.isInvisible());
-            return ActionResult.SUCCESS;
+            return InteractionResult.SUCCESS;
         }
 
-        ItemStack stackInHand = player.getStackInHand(hand);
-        if (!this.getHeldItemStack().isEmpty() || (this.getHeldItemStack().isEmpty() && stackInHand.isIn(ArsenalTags.DISPLAYABLE))) {
+        ItemStack stackInHand = player.getItemInHand(hand);
+        if (!this.getItem().isEmpty() || (this.getItem().isEmpty() && stackInHand.is(ArsenalTags.DISPLAYABLE))) {
             return super.interact(player, hand);
         }
 
-        return ActionResult.PASS;
+        return InteractionResult.PASS;
     }
 
     @Override
     public boolean isInvisible() {
-        return super.isInvisible() && !this.getHeldItemStack().isEmpty();
+        return super.isInvisible() && !this.getItem().isEmpty();
     }
 
     @Override
-    public boolean canStayAttached() {
-        return this.getWorld().getOtherEntities(this, this.getBoundingBox(), PREDICATE).isEmpty();
+    public boolean survives() {
+        return this.level().getEntities(this, this.getBoundingBox(), HANGABLE).isEmpty();
     }
 
-    protected ItemStack getAsItemStack() {
+    @Override
+    protected ItemStack getFrameItemStack() {
         return new ItemStack(ArsenalItems.WEAPON_RACK);
     }
 
     @Override
     public boolean isInvulnerableTo(DamageSource damageSource) {
-        // Invulnerable when the rack IS holding an item AND the player is NOT sneaking.
-        // Punch to drop the item, then punch the empty rack to break it.
-        // The previous condition was inverted: it made the EMPTY rack invulnerable to normal punches.
-        if (!(damageSource.getSource() instanceof PlayerEntity player)) {
+        if (!(damageSource.getDirectEntity() instanceof Player player)) {
             return super.isInvulnerableTo(damageSource);
         }
-        return !this.getHeldItemStack().isEmpty() && !player.isSneaking();
+        return !this.getItem().isEmpty() && !player.isShiftKeyDown();
     }
 }
