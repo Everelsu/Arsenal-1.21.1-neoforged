@@ -30,12 +30,12 @@ public class BloodScytheEntity extends AbstractArrow {
     }
 
     public BloodScytheEntity(Level world, LivingEntity owner) {
-        super(ArsenalEntities.BLOOD_SCYTHE.get(), owner, world, new ItemStack(ArsenalItems.SCYTHE), new ItemStack(ArsenalItems.SCYTHE));
+        super(ArsenalEntities.BLOOD_SCYTHE.get(), owner, world, new ItemStack(ArsenalItems.SCYTHE.get()), new ItemStack(ArsenalItems.SCYTHE.get()));
     }
 
     @Override
     protected ItemStack getDefaultPickupItem() {
-        return new ItemStack(ArsenalItems.SCYTHE);
+        return new ItemStack(ArsenalItems.SCYTHE.get());
     }
 
     public void addEffect(MobEffectInstance effect) {

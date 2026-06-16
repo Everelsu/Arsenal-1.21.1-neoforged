@@ -30,7 +30,7 @@ public abstract class DrownedEntityMixin extends Zombie {
         if ((double) random.nextFloat() > 0.9) {
             int i = random.nextInt(16);
             if (i < 10) {
-                this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ArsenalItems.ANCHORBLADE));
+                this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ArsenalItems.ANCHORBLADE.get()));
                 this.setGuaranteedDrop(EquipmentSlot.MAINHAND);
             }
         }

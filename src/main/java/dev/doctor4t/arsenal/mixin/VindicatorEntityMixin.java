@@ -27,7 +27,7 @@ public abstract class VindicatorEntityMixin extends AbstractIllager {
         if ((double) random.nextFloat() > 0.9) {
             int i = random.nextInt(16);
             if (i < 10) {
-                this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ArsenalItems.SCYTHE));
+                this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ArsenalItems.SCYTHE.get()));
                 this.setGuaranteedDrop(EquipmentSlot.MAINHAND);
             }
         }

@@ -33,7 +33,7 @@ public class AnchorbladeEntity extends AbstractArrow {
     }
 
     public AnchorbladeEntity(Level world, LivingEntity owner, ItemStack stack) {
-        super(ArsenalEntities.ANCHORBLADE.get(), owner, world, new ItemStack(ArsenalItems.ANCHORBLADE), stack);
+        super(ArsenalEntities.ANCHORBLADE.get(), owner, world, new ItemStack(ArsenalItems.ANCHORBLADE.get()), stack);
         this.setItem(stack.copy());
         this.setNoGravity(true);
         this.setReeling(ArsenalEnchantments.getLevel(ArsenalEnchantments.REELING, stack, world) > 0);
@@ -202,7 +202,7 @@ public class AnchorbladeEntity extends AbstractArrow {
 
     @Override
     protected ItemStack getDefaultPickupItem() {
-        return new ItemStack(ArsenalItems.ANCHORBLADE);
+        return new ItemStack(ArsenalItems.ANCHORBLADE.get());
     }
 
     @Override

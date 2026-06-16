@@ -36,7 +36,7 @@ public class HandledScreenMixin<T extends AbstractContainerMenu> {
     @Inject(method = "checkHotbarKeyPressed", at = @At("HEAD"), cancellable = true)
     private void arsenal$handleHotbarKeyPressed(int keyCode, int scanCode, CallbackInfoReturnable<Boolean> cir) {
         if (this.menu.getCarried().isEmpty() && this.hoveredSlot != null) {
-            if (ArsenalClient.swapKeybind.matchesKey(keyCode, scanCode)) {
+            if (ArsenalClient.swapKeybind.matches(keyCode, scanCode)) {
                 PacketDistributor.sendToServer(new SwapInventoryPayload(this.hoveredSlot.index));
                 cir.setReturnValue(true);
             }

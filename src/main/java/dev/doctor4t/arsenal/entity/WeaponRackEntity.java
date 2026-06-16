@@ -60,7 +60,7 @@ public class WeaponRackEntity extends ItemFrame {
 
     @Override
     protected ItemStack getFrameItemStack() {
-        return new ItemStack(ArsenalItems.WEAPON_RACK);
+        return new ItemStack(ArsenalItems.WEAPON_RACK.get());
     }
 
     @Override

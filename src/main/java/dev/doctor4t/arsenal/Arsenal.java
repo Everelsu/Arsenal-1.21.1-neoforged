@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -101,12 +102,12 @@ public class Arsenal {
     private void addCreativeTabEntries(final BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.COMBAT) {
             event.insertAfter(Items.TRIDENT.getDefaultInstance(), ArsenalItems.SCYTHE.get().getDefaultInstance(),
-                    BuildCreativeModeTabContentsEvent.TabVisibility.PARENT_AND_SEARCH_TABS);
+                    CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
             event.insertAfter(ArsenalItems.SCYTHE.get().getDefaultInstance(), ArsenalItems.ANCHORBLADE.get().getDefaultInstance(),
-                    BuildCreativeModeTabContentsEvent.TabVisibility.PARENT_AND_SEARCH_TABS);
+                    CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
         } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.insertAfter(Items.GLOW_ITEM_FRAME.getDefaultInstance(), ArsenalItems.WEAPON_RACK.get().getDefaultInstance(),
-                    BuildCreativeModeTabContentsEvent.TabVisibility.PARENT_AND_SEARCH_TABS);
+                    CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
         }
     }
 }
