@@ -177,7 +177,7 @@ public class AnchorbladeItem extends PickaxeItem implements CustomHitParticleIte
     public enum Skin {
         DEFAULT (0xFFD9D9D9, 0xFF7F8885, null, null,
                 Arsenal.id("item/anchorblade_in_hand"),           Arsenal.id("textures/entity/chain.png")),
-        LUXINTRUS(0xFF8E00FF, 0xFF5500AA, null, null,
+        LUXINTRUS(0xFF8E00FF, 0xFF5500AA, "L'Ancre", "tooltip.arsenal.anchorblade_luxintrus",
                 Arsenal.id("item/anchorblade_luxintrus_in_hand"), Arsenal.id("textures/entity/chain_luxintrus.png")),
         CARRION  (0xFFE9DFB8, 0xFF9D806E, null, null,
                 Arsenal.id("item/anchorblade_carrion_in_hand"),   Arsenal.id("textures/entity/chain_carrion.png")),
