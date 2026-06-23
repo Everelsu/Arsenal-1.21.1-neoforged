@@ -2,16 +2,11 @@
   <h1>Arsenal</h1>
   
   <a href="https://modrinth.com/user/ContentSMP"><img src="https://raw.githubusercontent.com/ContentSMP/Badges/refs/heads/main/csmp/cozy_vector.svg"></a>
-  <a href="https://modrinth.com/mod/ratatouille"><img src="https://raw.githubusercontent.com/ContentSMP/Badges/refs/heads/main/ratatouille/cozy_vector.svg"></a>
   <a href="https://discord.gg/rattiestgang"><img src="https://raw.githubusercontent.com/intergrav/devins-badges/refs/heads/v3/assets/cozy/social/discord-plural_vector.svg"></a>
   <a href="https://ko-fi.com/doctor4t"><img src="https://raw.githubusercontent.com/intergrav/devins-badges/refs/heads/v3/assets/cozy/donate/kofi-singular_vector.svg"></a>
 
   <h3>A weapons mod focused on adding few but qualitative weapons</h3>
 </div>
-
-<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/7ZNKNmoNTsQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/RUHAG4fT9CA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/s4POfzRYx3s" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
 ## Features
 ### Weapons
